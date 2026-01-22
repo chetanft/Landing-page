@@ -1,6 +1,9 @@
 .env
 .env.local
 
+# Allow .env.example to be tracked
+!.env.example
+
 # Dependencies
 node_modules/
 package-lock.json
