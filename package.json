@@ -2,15 +2,27 @@
   "name": "ft-tms-summary-dashboard",
   "version": "1.0.0",
   "type": "module",
+  "description": "FreightTiger TMS Summary Dashboard - Real-time visibility into orders, journeys, shipments, and indents",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chetanft/Landing-page.git"
+  },
+  "keywords": [
+    "freighttiger",
+    "tms",
+    "dashboard",
+    "react",
+    "typescript",
+    "logistics",
+    "transportation"
+  ],
+  "author": "",
+  "license": "ISC",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "FT TMS Summary Dashboard",
   "dependencies": {
     "@tanstack/react-query": "^5.90.18",
     "crypto-js": "^4.2.0",
