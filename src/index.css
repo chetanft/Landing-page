@@ -1,0 +1,176 @@
+/* FT Design System base styles only */
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family-primary, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+}
+
+/* Component-specific overrides for FT Design System integration */
+.search-input-wrapper {
+  width: 100% !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+  display: flex !important;
+}
+
+.date-picker-wrapper {
+  width: 100% !important;
+  flex: 1 1 auto !important;
+  display: flex !important;
+}
+
+/* DatePicker internals - apply requested changes */
+.date-picker-wrapper div.relative {
+  width: 100% !important;
+}
+
+.date-picker-wrapper input.bg-transparent {
+  width: 100% !important;
+}
+
+.date-picker-wrapper div.flex {
+  width: 100% !important;
+}
+
+.search-input-wrapper > * {
+  width: 100% !important;
+  flex: 1 1 auto !important;
+}
+
+.search-input-wrapper > div {
+  width: 100% !important;
+  flex: 1 1 auto !important;
+}
+
+/* Search input field styling - apply requested changes */
+.search-input-wrapper input[type="search"] {
+  width: 100% !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+  display: flex !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+  padding-right: 12px !important;
+  padding-left: 40px !important;
+  gap: 0px !important;
+}
+
+/* InputField relative container styling */
+/* Targets the div.relative container inside InputField */
+.search-input-wrapper div.relative {
+  gap: 12px !important;
+}
+
+/* InputField leading icon container alignment override */
+/* Targets the absolute positioned div containing the leading icon */
+/* Change 3: width fit-content */
+.search-input-wrapper div.absolute.left-4 {
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  width: fit-content !important;
+}
+
+/* Search icon path color override */
+/* Targets the path element inside Search icon component */
+/* Change 4: color var(--color-primary) */
+.search-input-wrapper svg path {
+  color: var(--color-primary) !important;
+  fill: var(--color-primary) !important;
+}
+
+/* Select component styling */
+button[role="combobox"] {
+  width: 100% !important;
+  border-radius: var(--radius-md) !important;
+}
+
+/* DropdownProvider span.text-md-rem color override */
+/* Targets spans with text-md-rem class inside dropdown/select components */
+button[role="combobox"] span.text-md-rem,
+span.text-md-rem {
+  color: var(--color-primary) !important;
+}
+
+/* SelectValue span.text-md-rem font-size override */
+/* Targets spans with text-md-rem class inside SelectValue component */
+/* Changes font-size from 16.002px to 14px */
+button[role="combobox"] span.text-md-rem {
+  font-size: 14px !important;
+}
+
+/* Override for critical text color */
+.text-critical {
+  color: var(--badge-danger-text) !important;
+}
+
+/* Typography title-primary variant overrides */
+h1.font-sans.font-normal {
+  font-family: var(--font-family-primary, "Inter", sans-serif) !important;
+  font-size: 24px !important;
+  font-weight: 600 !important;
+}
+
+/* Typography body-primary-regular date/time color override */
+/* Targets Typography components with body-primary-regular variant displaying dates/times */
+/* Changes color from var(--text-primary) to var(--color-secondary) */
+/* This rule targets elements with fontSize in style attribute, including those with both fontSize and color */
+/* Has equal specificity to FilterOption rule and comes last, so it takes precedence for date/time Typography */
+p.font-sans.font-normal[style*="fontSize"][style*="color"],
+p.font-sans.font-normal[style*="fontSize"] {
+  color: var(--color-secondary) !important;
+}
+
+/* FilterOption Typography color override - targets Typography with body-primary-regular variant */
+/* Overrides inline style color from var(--text-primary) to var(--primary-500) for FTL label */
+/* This specifically targets the Typography element rendered by FilterOption component */
+/* Note: This rule is commented out as date/time rule takes precedence */
+/* If FilterOption components need var(--primary-500), this rule can be uncommented and made more specific */
+/* p.font-sans.font-normal[style*="fontSize"][style*="color"] {
+  color: var(--primary-500) !important;
+} */
+
+/* ErrorBanner Col component styling */
+/* Targets the div.relative container inside Col component in ErrorBanner */
+/* Changes 1-4, 14: display flex, flex-direction column, justify-content flex-start, align-items center, gap 4px */
+.error-banner-wrapper div.relative {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+/* ErrorBanner Icon component styling */
+/* Targets the span.icon element inside Icon component in ErrorBanner */
+/* Changes 5-13: display flex, flex-direction column, width/height fit-content, justify-content flex-start, padding 12px */
+.error-banner-wrapper span.icon {
+  display: flex !important;
+  flex-direction: column !important;
+  width: fit-content !important;
+  height: fit-content !important;
+  justify-content: flex-start !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+/* Pulse animation for skeleton loaders */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}

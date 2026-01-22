@@ -1,0 +1,176 @@
+# Postman Setup Guide - FreightTiger TMS API
+
+## Quick Setup (5 minutes)
+
+### Step 1: Import Collection and Environment
+1. Open Postman
+2. Click **Import** (top left)
+3. Import both files:
+   - `FreightTiger_TMS_API.postman_collection.json`
+   - `FreightTiger_TMS_Environment.postman_environment.json`
+
+### Step 2: Select Environment
+1. Click the **environment dropdown** (top right, next to the eye icon)
+2. Select **"FreightTiger TMS Environment"**
+
+### Step 3: Set Login Credentials
+
+**Option A: Use Plain Password (Easiest)**
+1. Click the **eye icon** (top right) → **Manage Environments**
+2. Select **FreightTiger TMS Environment**
+3. Set these values:
+   - `username`: Your username or email
+   - `plain_password`: Your actual password (plain text)
+   - `app_id`: `web` (default, usually don't need to change)
+   - `base_url`: `https://api.freighttiger.com` (default)
+   - `planning_base_url`: Already set (default)
+4. The password will be auto-encrypted when you send the Login request
+
+**Option B: Pre-encrypt Password**
+1. Open `password-encryptor.html` in your browser
+2. Enter your username and plain password
+3. Click "Encrypt Password"
+4. Copy the encrypted password
+5. In Postman environment, set:
+   - `username`: Your username
+   - `password`: The encrypted password (paste from step 3)
+   - `dynamic_id`: Copy the Dynamic ID shown in the tool
+   - `app_id`: `web` (default)
+
+### Step 4: Login First (IMPORTANT!)
+1. Go to folder: **1. Authentication** → **Login**
+2. Click **Send**
+3. ✅ **Check the Test Results tab** - You should see:
+   - ✅ Access token saved to environment
+   - ✅ Refresh token saved to environment
+   - ✅ User ID saved
+   - ✅ Org ID saved
+   - etc.
+
+### Step 5: Use Other APIs
+Now all other APIs will automatically use the saved token! Try:
+- **1. Authentication** → **Get Desks**
+- **2. Journeys** → **Get Journey Counts**
+- **3. Orders** → **Get Orders List**
+- etc.
+
+---
+
+## Troubleshooting 401 Errors
+
+### Problem: Getting 401 Unauthorized on all APIs except Login
+
+**Solution**: The token wasn't saved after login. Follow these steps:
+
+1. **Check Environment is Selected**
+   - Make sure "FreightTiger TMS Environment" is selected (top right dropdown)
+
+2. **Run Login Again**
+   - Go to **1. Authentication** → **Login**
+   - Click **Send**
+   - Check the **Test Results** tab (bottom panel)
+   - You should see green checkmarks ✅
+
+3. **Verify Token is Saved**
+   - Click the **eye icon** (top right)
+   - Look for `access_token` variable
+   - It should have a long token value (not empty)
+
+4. **Check Console**
+   - Click **Console** tab (bottom left)
+   - After login, you should see messages like:
+     - ✅ Access token saved to environment
+     - ✅ User ID saved: xxx
+     - ✅ Org ID saved: xxx
+
+5. **Manual Token Check**
+   - If auto-save didn't work, manually copy the token:
+     - In Login response, find `access_token` or `auth_token`
+     - Copy the value
+     - Go to Environment → Set `access_token` = (paste value)
+
+---
+
+## How Auto-Save Works
+
+The Login request has a **Test Script** that automatically:
+1. Extracts `access_token` or `auth_token` from response
+2. Extracts `refresh_token` if available
+3. Decodes JWT token to extract user info:
+   - `user_id`
+   - `org_id`
+   - `company_fteid`
+   - `branch_fteid`
+4. Saves all values to environment variables
+
+**This happens automatically** - you don't need to do anything!
+
+---
+
+## Environment Variables Reference
+
+| Variable | Description | Auto-Set? |
+|----------|-------------|-----------|
+| `access_token` | Bearer token for API calls | ✅ Yes (from Login) |
+| `refresh_token` | Token for refreshing access | ✅ Yes (from Login) |
+| `user_id` | Your user ID | ✅ Yes (from Login) |
+| `org_id` | Your organization ID | ✅ Yes (from Login) |
+| `company_fteid` | Company FTEID | ✅ Yes (from Login) |
+| `branch_fteid` | Branch FTEID | ✅ Yes (from Login) |
+| `username` | Your username/email | ❌ Manual |
+| `password` | Your encrypted password | ❌ Manual |
+| `app_id` | Application ID (default: "web") | ❌ Manual |
+| `dynamic_id` | Dynamic ID for encryption | ✅ Auto-generated |
+| `base_url` | API base URL | ❌ Manual (default set) |
+| `planning_base_url` | Planning API base URL | ❌ Manual (default set) |
+
+---
+
+## Common Issues
+
+### Issue 1: "Token expired" after some time
+**Solution**: Use **Refresh Token** request:
+1. Go to **1. Authentication** → **Refresh Token**
+2. Click **Send**
+3. New token will be auto-saved
+
+### Issue 2: Login works but other APIs still return 401
+**Solution**: 
+1. Make sure environment is selected (top right)
+2. Check `access_token` is set (eye icon)
+3. Try Login again to refresh token
+
+### Issue 3: Can't see username/password fields
+**Solution**: 
+- They're in the **Body** tab of Login request
+- Or set them in Environment Variables (eye icon)
+- Variables: `{{username}}` and `{{password}}`
+
+### Issue 4: Dynamic ID error
+**Solution**: 
+- It's auto-generated by Pre-request Script
+- If issues, manually set `dynamic_id` = `Date.now() + UUID`
+
+---
+
+## Tips
+
+1. **Always Login First**: Run Login before testing other APIs
+2. **Check Test Results**: After Login, check Test Results tab for confirmation
+3. **Use Environment**: Always use "FreightTiger TMS Environment" (not collection variables)
+4. **Save Responses**: Use Postman's "Save Response" feature for debugging
+5. **Console Logs**: Check Console tab for detailed logs
+
+---
+
+## Next Steps
+
+After successful login:
+1. ✅ Token is saved automatically
+2. ✅ User info is saved automatically
+3. ✅ All other APIs will work automatically
+4. 🎉 Start testing your APIs!
+
+---
+
+**Need Help?** Check the Console tab for detailed error messages and logs.
