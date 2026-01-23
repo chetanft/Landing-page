@@ -4,6 +4,7 @@ import { AuthenticationError } from '../auth/authApiService'
 import { fetchIndentsCount, type IndentsApiResponse } from './indentsApiService'
 import { MODULE_URLS } from '../config/moduleNavigation'
 import { buildFtTmsUrl, ftTmsFetch } from './ftTmsClient'
+import { TokenManager } from '../auth/tokenManager'
 import { JOURNEY_COUNT_ONLY_MODE } from '../config/apiMode'
 
 // API response types based on the provided structure
@@ -131,129 +132,16 @@ const MILESTONE_TO_STAGE_MAPPING = {
  * Fetch journey metrics from the real API with enhanced error handling
  */
 export const fetchJourneyMetrics = async (globalFilters: GlobalFilters): Promise<TabData> => {
-  try {
-    // Always fetch both journey data and indents data in parallel
-    const [epodSummary, journeyData, indentsData] = await Promise.all([
-      fetchJourneyEpodSummary(),
-      fetchJourneyMetricsFromAPI(globalFilters),
-      fetchIndentsCount(globalFilters)
-    ])
+  // Always fetch both journey data and indents data in parallel
+  const [epodSummary, journeyData, indentsData] = await Promise.all([
+    fetchJourneyEpodSummary(),
+    fetchJourneyMetricsFromAPI(globalFilters),
+    fetchIndentsCount(globalFilters)
+  ])
 
-    // Combine indents data with journey data
-    const withEpod = applyEpodSummaryToJourneys(journeyData, epodSummary)
-    return combineJourneyAndIndentsData(withEpod, indentsData)
-  } catch (error) {
-    console.error('Failed to fetch journey metrics from real API:', error)
-
-    // Re-throw authentication errors to trigger login flow
-    if (isAuthError(error)) {
-      throw error
-    }
-
-    // For other errors, use fallback data but log the error
-    if (error instanceof ApiError) {
-      console.warn(`API Error ${error.status}: ${error.message}. Using fallback data.`)
-    } else {
-      console.warn('Network or unknown error. Using fallback data:', error)
-    }
-
-    return await fetchJourneyMetricsFallback()
-  }
-}
-
-/**
- * Fallback function with mock data (used when real API fails)
- */
-const fetchJourneyMetricsFallback = async (): Promise<TabData> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 300))
-
-  // Mock data that matches the API structure you provided
-  const mockApiResponse: JourneyApiResponse = {
-    success: true,
-    data: {
-      milestone: {
-        BEFORE_ORIGIN: {
-          count: 9,
-          alerts: {},
-          analytics: {}
-        },
-        AT_ORIGIN: {
-          count: 2,
-          alerts: {},
-          analytics: {}
-        },
-        IN_TRANSIT: {
-          count: 146,
-          alerts: {
-            count: 308,
-            long_stoppage: { count: 9 },
-            eway_bill: { count: 0 },
-            route_deviation: { count: 8 }
-          },
-          analytics: {
-            count: 146,
-            delay_in_minutes: {
-              count: 146,
-              time_bucket: {
-                '0-6h': 57,
-                '6-12h': 7,
-                '12h': 82
-              }
-            },
-            expected_arrival: {
-              count: 146,
-              time_bucket: {
-                '0-12h': 39,
-                '12h': 107
-              }
-            }
-          }
-        },
-        AT_DESTINATION: {
-          count: 18,
-          alerts: {},
-          analytics: {}
-        },
-        IN_RETURN: {
-          count: 0,
-          alerts: {},
-          analytics: {}
-        },
-        AFTER_DESTINATION: {
-          count: 13,
-          alerts: {},
-          analytics: {}
-        },
-        CLOSED: {
-          count: 3136,
-          alerts: {
-            count: 0
-          },
-          analytics: {
-            count: 3136,
-            epod_status: {
-              count: 3136,
-              time_bucket: {
-                pending_submission: 2800,
-                approval_pending: 150,
-                verified_as_unclean: 86,
-                verified_as_clean: 100
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // Get mock indents data from the indents service
-  // Transform journey data and combine with indents
-  const journeyTabData = transformApiDataToTabData(mockApiResponse)
-
-  // Always combine indents data with journey data
-  const mockIndentsData = await fetchIndentsCount({} as GlobalFilters)
-  return combineJourneyAndIndentsData(journeyTabData, mockIndentsData)
+  // Combine indents data with journey data
+  const withEpod = applyEpodSummaryToJourneys(journeyData, epodSummary)
+  return combineJourneyAndIndentsData(withEpod, indentsData)
 }
 
 const getEpodTotal = (response: EpodListApiResponse | null | undefined): number => {
@@ -282,7 +170,7 @@ const getEpodTotal = (response: EpodListApiResponse | null | undefined): number 
 
 const fetchJourneyEpodSummary = async (): Promise<EpodSummary> => {
   try {
-    const baseUrl = buildFtTmsUrl('/trip-snapshot/api/v1/epods')
+    const baseUrl = buildFtTmsUrl('/api/trip-snapshot/api/v1/epods')
     const makeUrl = (params: Record<string, string>) => {
       const search = new URLSearchParams({ page: '1', size: '1', ...params })
       return `${baseUrl}?${search.toString()}`
@@ -400,7 +288,7 @@ const applyEpodSummaryToJourneys = (journeyData: TabData, epodSummary: EpodSumma
  * Real API call implementation - Now activated
  */
 export const fetchJourneyMetricsFromAPI = async (globalFilters: GlobalFilters): Promise<TabData> => {
-  const baseUrl = buildFtTmsUrl('/journey-snapshot/v1/journeys/count')
+  const baseUrl = buildFtTmsUrl('/api/journey-snapshot/v1/journeys/count')
   const isLocalOnly = import.meta.env.DEV
 
   // Format dates for the API (match FT app format exactly)
@@ -442,6 +330,10 @@ export const fetchJourneyMetricsFromAPI = async (globalFilters: GlobalFilters): 
     params.append('transporter_fteid', globalFilters.transporterId)
   }
 
+  if (globalFilters.consigneeId) {
+    params.append('consignee_fteid', globalFilters.consigneeId)
+  }
+
   // Add milestones as array parameters (include PLANNED to match FT app behavior)
   const milestones = ['PLANNED', 'BEFORE_ORIGIN', 'AT_ORIGIN', 'IN_TRANSIT', 'AT_DESTINATION', 'IN_RETURN', 'AFTER_DESTINATION', 'CLOSED']
   milestones.forEach(milestone => {
@@ -461,7 +353,28 @@ export const fetchJourneyMetricsFromAPI = async (globalFilters: GlobalFilters): 
   })
 
   try {
-    const response = await ftTmsFetch(`${baseUrl}?${params.toString()}`)
+    const token = TokenManager.getAccessToken()
+    if (!token) {
+      throw new AuthenticationError('No access token available for journey snapshot')
+    }
+
+    const userContext = TokenManager.getUserContext()
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`
+    }
+    if (userContext?.orgId) {
+      headers['X-FT-ORGID'] = userContext.orgId
+    }
+    if (userContext?.userId) {
+      headers['X-FT-USERID'] = userContext.userId
+    }
+
+    const response = await fetch(`${baseUrl}?${params.toString()}`, {
+      method: 'GET',
+      headers,
+      credentials: 'include'
+    })
     const data: JourneyApiResponse = await response.json()
     if (isLocalOnly) {
       console.log('[FT TMS] journeys/count raw response:', data)

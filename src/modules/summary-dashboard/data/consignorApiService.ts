@@ -1,49 +1,20 @@
 import { buildFtTmsUrl, ftTmsFetch } from './ftTmsClient'
+import { fetchBranchChildren } from './branchApiService'
 import { getCompanyInfo } from './companyApiService'
-import { JOURNEY_COUNT_ONLY_MODE } from '../config/apiMode'
 
 export interface ConsignorOption {
   value: string
   label: string
 }
 
-export interface ConsignorApiResponse {
-  success: boolean
-  data: Array<{
-    fteid: string
-    name: string
-    partner_type: string
-    status: string
-  }>
-  total: number
-  page: number
-  size: number
-}
-
-const MOCK_CONSIGNORS: ConsignorOption[] = [
-  { value: '', label: 'All Locations' },
-  { value: 'MDC-001', label: 'MDC Labs, Amritsar' },
-  { value: 'HUB-002', label: 'Hub Delhi' },
-  { value: 'HUB-003', label: 'Hub Mumbai' },
-  { value: 'HUB-004', label: 'Hub Bangalore' },
-  { value: 'HUB-005', label: 'Hub Chennai' },
-]
-
 export const fetchConsignors = async (): Promise<ConsignorOption[]> => {
-  if (JOURNEY_COUNT_ONLY_MODE) {
-    return MOCK_CONSIGNORS
-  }
-
   try {
-    // Get current user's company info
     const companyInfo = await getCompanyInfo()
-
     if (!companyInfo) {
-      console.warn('No company info available, using mock data')
-      return MOCK_CONSIGNORS
+      throw new Error('No company info available for consignor fetch')
     }
 
-    const baseUrl = buildFtTmsUrl('/eqs/v1/company/partners')
+    const baseUrl = buildFtTmsUrl('/api/eqs/v1/company/partners')
     const params = new URLSearchParams({
       parent_fteid: companyInfo.fteid,
       filter: JSON.stringify({ partner_type: 'CNR' }),
@@ -54,25 +25,54 @@ export const fetchConsignors = async (): Promise<ConsignorOption[]> => {
     })
 
     const response = await ftTmsFetch(`${baseUrl}?${params}`)
-    const result: ConsignorApiResponse = await response.json()
-
-    if (result.success && result.data && result.data.length > 0) {
-      const consignorOptions: ConsignorOption[] = [
-        { value: '', label: 'All Locations' },
-        ...result.data
-          .filter(consignor => consignor.status === 'active' || consignor.status === 'ACTIVE')
-          .map(consignor => ({
-            value: consignor.fteid,
-            label: consignor.name
-          }))
-      ]
-      return consignorOptions
-    } else {
-      console.warn('API returned empty consignor data, using mock data')
-      return MOCK_CONSIGNORS
+    const result = await response.json() as {
+      success: boolean
+      data: Array<{
+        fteid?: string
+        name?: string
+        branch_fteid?: string | null
+        branch_name?: string | null
+      }>
     }
+
+    if (!result.success || !result.data || result.data.length === 0) {
+      const fallbackBranches = await fetchBranchChildren()
+      if (fallbackBranches.length > 0) {
+        return fallbackBranches.map(branch => ({
+          value: branch.value,
+          label: branch.label
+        }))
+      }
+      throw new Error('API returned empty consignor data')
+    }
+
+    const branches = new Map<string, string>()
+    result.data.forEach((consignor) => {
+      const value = consignor.branch_fteid || consignor.fteid
+      if (!value) return
+      const label = consignor.branch_name || consignor.name || value
+      branches.set(value, label)
+    })
+
+    const consignorOptions = Array.from(branches.entries()).map(([value, label]) => ({
+      value,
+      label
+    }))
+
+    if (consignorOptions.length === 0) {
+      const fallbackBranches = await fetchBranchChildren()
+      if (fallbackBranches.length > 0) {
+        return fallbackBranches.map(branch => ({
+          value: branch.value,
+          label: branch.label
+        }))
+      }
+      throw new Error('No branches returned from consignor partners')
+    }
+
+    return consignorOptions
   } catch (error) {
     console.error('Error fetching consignors:', error)
-    return MOCK_CONSIGNORS
+    throw error
   }
 }

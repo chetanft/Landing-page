@@ -7,12 +7,14 @@ import {
 } from 'ft-design-system'
 import type { GlobalFilters } from '../types/metrics'
 import { useTransporters } from '../hooks/useTransporters'
+import { useConsignees } from '../hooks/useConsignees'
 
 interface FilterPaneProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   globalFilters: GlobalFilters
   onFiltersChange: (filters: Partial<GlobalFilters>) => void
+  transporterPtlOnly?: boolean
 }
 
 export default function FilterPane({
@@ -20,20 +22,26 @@ export default function FilterPane({
   onOpenChange,
   globalFilters,
   onFiltersChange,
+  transporterPtlOnly = false,
 }: FilterPaneProps) {
-  const { transporters, isLoading: transportersLoading } = useTransporters()
+  const { transporters, isLoading: transportersLoading } = useTransporters(transporterPtlOnly)
+  const { consignees, isLoading: consigneesLoading } = useConsignees()
   
   // Local state for filter values (allows cancel without applying)
   const [localTransporterId, setLocalTransporterId] = useState<string | undefined>(
     globalFilters.transporterId
+  )
+  const [localConsigneeId, setLocalConsigneeId] = useState<string | undefined>(
+    globalFilters.consigneeId
   )
 
   // Sync local state when globalFilters change (e.g., when drawer opens)
   useEffect(() => {
     if (open) {
       setLocalTransporterId(globalFilters.transporterId)
+      setLocalConsigneeId(globalFilters.consigneeId)
     }
-  }, [open, globalFilters.transporterId])
+  }, [open, globalFilters.transporterId, globalFilters.consigneeId])
 
   // Handle ESC key to close
   useEffect(() => {
@@ -42,30 +50,42 @@ export default function FilterPane({
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setLocalTransporterId(globalFilters.transporterId)
+        setLocalConsigneeId(globalFilters.consigneeId)
         onOpenChange(false)
       }
     }
 
     document.addEventListener('keydown', handleEscape)
     return () => document.removeEventListener('keydown', handleEscape)
-  }, [open, globalFilters.transporterId, onOpenChange])
+  }, [open, globalFilters.transporterId, globalFilters.consigneeId, onOpenChange])
 
   const handleTransporterChange = (value: string | number) => {
     const normalizedValue = String(value ?? '')
     setLocalTransporterId(normalizedValue || undefined)
   }
 
+  const handleConsigneeChange = (value: string | number) => {
+    const normalizedValue = String(value ?? '')
+    setLocalConsigneeId(normalizedValue || undefined)
+  }
+
   const handleReset = () => {
     setLocalTransporterId(undefined)
+    setLocalConsigneeId(undefined)
   }
 
   const handleApply = () => {
     const selectedTransporter = transporters.find(
       (t) => t.value === localTransporterId
     )
+    const selectedConsignee = consignees.find(
+      (c) => c.value === localConsigneeId
+    )
     onFiltersChange({
       transporterId: localTransporterId,
       transporterName: selectedTransporter?.label || 'All Transporters',
+      consigneeId: localConsigneeId,
+      consigneeName: selectedConsignee?.label || 'All Consignees',
     })
     onOpenChange(false)
   }
@@ -73,6 +93,7 @@ export default function FilterPane({
   const handleClose = () => {
     // Reset local state to globalFilters when closing without applying
     setLocalTransporterId(globalFilters.transporterId)
+    setLocalConsigneeId(globalFilters.consigneeId)
     onOpenChange(false)
   }
 
@@ -165,7 +186,7 @@ export default function FilterPane({
               variant="body-secondary-medium"
               style={{
                 fontSize: 'var(--font-size-sm)',
-                color: 'var(--color-primary)',
+                color: 'var(--primary)',
                 marginBottom: 'var(--spacing-x4)',
               }}
             >
@@ -199,6 +220,38 @@ export default function FilterPane({
                   ...transporters.map((transporter) => ({
                     value: transporter.value,
                     label: transporter.label,
+                  })),
+                ]}
+                style={{ width: '100%' }}
+              />
+            </div>
+
+            {/* Consignee filter */}
+            <div style={{ marginBottom: 'var(--spacing-x4)' }}>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--spacing-x1)',
+                  marginBottom: 'var(--spacing-x2)',
+                }}
+              >
+                <Typography
+                  variant="body-secondary-medium"
+                  style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)' }}
+                >
+                  Consignee
+                </Typography>
+              </label>
+              <SelectLegacy
+                value={localConsigneeId || ''}
+                onChange={handleConsigneeChange}
+                placeholder={consigneesLoading ? 'Loading...' : 'Select consignee'}
+                options={[
+                  { value: '', label: 'All Consignees' },
+                  ...consignees.map((consignee) => ({
+                    value: consignee.value,
+                    label: consignee.label,
                   })),
                 ]}
                 style={{ width: '100%' }}

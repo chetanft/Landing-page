@@ -199,13 +199,6 @@ curl "https://api.freighttiger.com/ptl-booking/api/v1/order/{order_id}/details" 
   -H "Accept: application/json"
 ```
 
-### 3.4 Get Order Timeline
-```bash
-curl "https://api.freighttiger.com/ptl-booking/api/v1/order/{order_id}/timeline" \
-  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
-  -H "Accept: application/json"
-```
-
 ### 3.5 Get Order Comments
 ```bash
 curl "https://api.freighttiger.com/ptl-booking/api/v1/order/{order_id}/comments" \
@@ -223,17 +216,6 @@ curl -X POST "https://api.freighttiger.com/ptl-booking/api/v1/order/{order_id}/c
     "template_id": "optional_template_id"
   }'
 ```
-
-### 3.7 Get Comment Templates
-```bash
-curl "https://api.freighttiger.com/ptl-booking/api/v1/order/comments/templates" \
-  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
-  -H "Accept: application/json"
-```
-
----
-
-## 4. Indents APIs
 
 ### 4.1 Get Indents Count
 ```bash
@@ -418,13 +400,6 @@ curl "https://api.freighttiger.com/eqs/v1/branch?company_fteid=COM-xxx&sort=-upd
 **Query Parameters**:
 - `company_fteid`: Company FTEID
 - `sort`: Sort field (e.g., -updated_at)
-
-### 8.4 Get User Profile
-```bash
-curl "https://api.freighttiger.com/eqs/v1/user/profile" \
-  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
-  -H "Accept: application/json"
-```
 
 ### 8.5 Get Current Company
 ```bash

@@ -4,7 +4,7 @@ import path from 'path'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const ftTmsApiBaseUrl = env.FT_TMS_API_BASE_URL || ''
+  const ftTmsApiBaseUrl = env.FT_TMS_API_BASE_URL || 'https://api.freighttiger.com/api'
   const ftTmsProxyUrl = env.FT_TMS_PROXY_URL || ''
   const ftTmsUniqueId = env.FT_TMS_UNIQUE_ID || ''
   const ftTmsAppId = env.FT_TMS_APP_ID || 'web'
@@ -48,6 +48,12 @@ export default defineConfig(({ mode }) => {
           configure: (proxyServer) => {
             // Proxy configuration - authentication headers are added by ftTmsFetch
             // based on tokens stored from login API
+            proxyServer.on('proxyReq', (proxyReq, req) => {
+              if (req.url && req.url.includes('/journey-snapshot/')) {
+                proxyReq.setHeader('Origin', 'https://www.freighttiger.com')
+                proxyReq.setHeader('Referer', 'https://www.freighttiger.com/')
+              }
+            })
           }
         },
         '/__planning': {

@@ -4,9 +4,7 @@ import { TokenManager } from '../auth/tokenManager'
 import type {
   OrdersListResponse,
   OrderDetailsResponse,
-  OrderTimelineResponse,
   OrderCommentsResponse,
-  CommentTemplatesResponse,
   AddCommentRequest,
   AddCommentResponse,
   OrderRow,
@@ -51,6 +49,14 @@ export async function resolveOrdersContext(globalFilters: GlobalFilters): Promis
   const isBranchFteid = (value?: string | null) =>
     Boolean(value && (value.startsWith('BRH-') || value.startsWith('BRN-')))
 
+  const isAllLocations =
+    !globalFilters.locationId ||
+    globalFilters.locationId === '' ||
+    globalFilters.locationName === 'All Locations'
+  if (isAllLocations) {
+    return undefined
+  }
+
   // 1. Check globalFilters.locationId
   if (globalFilters.locationId && isBranchFteid(globalFilters.locationId)) {
     return globalFilters.locationId
@@ -58,13 +64,13 @@ export async function resolveOrdersContext(globalFilters: GlobalFilters): Promis
 
   // 2. Check environment variable
   const envBranch = import.meta.env.VITE_FT_TMS_BRANCH_FTEID
-  if (envBranch && isBranchFteid(envBranch)) {
+  if (envBranch) {
     return envBranch
   }
 
   // 3. Check user context from token
   const userContext = TokenManager.getUserContext()
-  if (userContext?.branchId && isBranchFteid(userContext.branchId)) {
+  if (userContext?.branchId) {
     return userContext.branchId
   }
 
@@ -72,7 +78,7 @@ export async function resolveOrdersContext(globalFilters: GlobalFilters): Promis
   try {
     const userSettings = await realApiService.getUserSettings()
     const lastBranch = userSettings?.data?.lastSelectedBranch
-    if (lastBranch && isBranchFteid(lastBranch)) {
+    if (lastBranch) {
       if (import.meta.env.DEV) {
         console.log('[resolveOrdersContext] Using lastSelectedBranch from user settings:', lastBranch)
       }
@@ -88,7 +94,7 @@ export async function resolveOrdersContext(globalFilters: GlobalFilters): Promis
   try {
     const hierarchy = await realApiService.getCompanyHierarchy()
     const firstBranch = hierarchy?.data?.total_branches?.find(branch =>
-      branch.fteid && isBranchFteid(branch.fteid)
+      branch.fteid
     )
     if (firstBranch?.fteid) {
       if (import.meta.env.DEV) {
@@ -309,7 +315,6 @@ function normalizeTripType(tripType: any): OrderRow['tripType'] {
   if (upper === 'UNPLANNED') {
     return 'Unplanned'
   }
-  // Default fallback
   return 'Unplanned'
 }
 
@@ -418,74 +423,8 @@ function resolveOrderId(apiOrder: any): string | undefined {
 /**
  * Extract stage/milestone/dispatch date from timeline data
  */
-function extractTimelineSignals(timeline: OrderTimelineResponse['data'] | null): {
-  stage?: string
-  milestone?: string
-  dispatchDate?: string
-} {
-  if (!timeline || !Array.isArray(timeline.events)) return {}
-
-  const events = timeline.events
-    .map((event) => ({
-      ...event,
-      timestampMs: event.timestamp ? new Date(event.timestamp).getTime() : 0
-    }))
-    .sort((a, b) => a.timestampMs - b.timestampMs)
-
-  const lastEvent = events[events.length - 1]
-  const dispatchEvent = events.find((event) => {
-    const label = String(event.label || '').toLowerCase()
-    return label.includes('dispatch')
-  })
-
-  return {
-    stage: lastEvent?.label || lastEvent?.type || undefined,
-    milestone: lastEvent?.subLabel || lastEvent?.label || undefined,
-    dispatchDate: dispatchEvent?.timestamp || undefined,
-  }
-}
-
-/**
- * Enrich orders with timeline-derived stage/milestone/dispatchDate
- * Limits concurrency to avoid overloading APIs.
- */
 async function enrichOrdersFromTimeline(orders: OrderRow[]): Promise<OrderRow[]> {
-  const candidates = orders
-    .filter(order => !order.milestone || !order.dispatchDate || !order.stage || order.stage === '—')
-    .slice(0, 25)
-
-  if (candidates.length === 0) return orders
-
-  const concurrency = 5
-  const results: OrderRow[] = [...orders]
-
-  const queue = [...candidates]
-  const workers = Array.from({ length: concurrency }).map(async () => {
-    while (queue.length > 0) {
-      const order = queue.shift()
-      if (!order) return
-      try {
-        const timeline = await fetchOrderTimeline(order.id)
-        const signals = extractTimelineSignals(timeline)
-        const index = results.findIndex(o => o.id === order.id)
-        if (index >= 0) {
-          results[index] = {
-            ...results[index],
-            stage: signals.stage || results[index].stage,
-            milestone: signals.milestone || results[index].milestone,
-            dispatchDate: signals.dispatchDate || results[index].dispatchDate,
-          }
-        }
-      } catch (error) {
-        if (import.meta.env.DEV) {
-          console.warn('[enrichOrdersFromTimeline] Failed to enrich order:', order.id, error)
-        }
-      }
-    }
-  })
-
-  await Promise.all(workers)
-  return results
+  return orders
 }
 
 /**
@@ -605,17 +544,19 @@ function buildOrdersMasterSearchPayload(
   pageSize: number,
   branchFteid?: string
 ) {
+  const isBranchFteid = (value?: string | null) =>
+    Boolean(value && (value.startsWith('BRH-') || value.startsWith('BRN-')))
   const payload = {
     page,
     size: pageSize,
     group_fteid: null as string | null,
-    branch_fteid: branchFteid ?? null,
-    sort: ['-updatedAt'],
+    branch_fteid: isBranchFteid(branchFteid) ? branchFteid : null,
+    sort: ['-updatedAt'], // Match FT TMS app master-search request
     filters: [
       {
         field: 'STATUS',
         operator: 'in',
-        value: DEFAULT_MASTER_SEARCH_STATUSES
+        value: ['UNPLANNED', 'PARTIALLY_PLANNED', 'PLANNED', 'DISPATCHED'] // Match FT TMS app request
       }
     ],
     includeDeletedOnly: false
@@ -640,7 +581,9 @@ async function fetchOrdersFromMasterSearch(
     locationId: globalFilters.locationId || resolvedLocationId || undefined,
   }
 
-  const payload = buildOrdersMasterSearchPayload(filters, effectiveFilters, page, pageSize, effectiveFilters.locationId)
+  let branchFteid = effectiveFilters.locationId
+
+  const payload = buildOrdersMasterSearchPayload(filters, effectiveFilters, page, pageSize, branchFteid)
   const response = await realApiService.searchOrdersMaster(payload)
 
   if (!response || response.success === false) {
@@ -699,139 +642,53 @@ async function fetchOrdersFromMasterSearch(
 export async function fetchOrdersBucketSummary(
   globalFilters: GlobalFilters
 ): Promise<OrdersBucketSummary['data'] | null> {
-  try {
-    const baseUrl = buildFtTmsUrl('/ptl-booking/api/v1/order/myOrdersBucketSummary')
-    
-    // Build query parameters for date range if provided
-    const params = new URLSearchParams()
-    if (globalFilters.dateRange) {
-      const fromDate = globalFilters.dateRange.start.getTime()
-      const toDate = globalFilters.dateRange.end.getTime()
-      params.append('from_booking_date', String(fromDate))
-      params.append('to_booking_date', String(toDate))
-    }
-    
-    const queryString = params.toString()
-    const url = queryString ? `${baseUrl}?${queryString}` : baseUrl
-    
-    const response = await ftTmsFetch(url)
-    const data: OrdersBucketSummary = await response.json()
+  const baseUrl = buildFtTmsUrl('/api/ptl-booking/api/v1/order/myOrdersBucketSummary')
 
-    if (!data.success) {
-      throw new Error('API returned failure status')
-    }
-
-    if (import.meta.env.DEV) {
-      console.log('[fetchOrdersBucketSummary] Response:', data.data)
-    }
-
-    return data.data
-  } catch (error) {
-    console.error('Error fetching orders bucket summary:', error)
-    return null
+  // Build query parameters for date range if provided
+  const params = new URLSearchParams()
+  if (globalFilters.dateRange) {
+    const fromDate = globalFilters.dateRange.start.getTime()
+    const toDate = globalFilters.dateRange.end.getTime()
+    params.append('from_booking_date', String(fromDate))
+    params.append('to_booking_date', String(toDate))
   }
+
+  const queryString = params.toString()
+  const url = queryString ? `${baseUrl}?${queryString}` : baseUrl
+
+  const response = await ftTmsFetch(url)
+  const data: OrdersBucketSummary = await response.json()
+
+  if (!data.success) {
+    throw new Error('API returned failure status')
+  }
+
+  if (import.meta.env.DEV) {
+    console.log('[fetchOrdersBucketSummary] Response:', data.data)
+  }
+
+  return data.data
 }
 
 /**
  * Fetch orders list with filters and summary
- * Uses real API with normalization and fallback support
+ * Uses real API with normalization
  */
 export async function fetchOrders(
   filters: Set<FilterId>,
   outboundOption: string | null,
   globalFilters: GlobalFilters,
   page: number = 1,
-  pageSize: number = 50
+  pageSize: number = 1000
 ): Promise<{ orders: OrderRow[]; summary: OrderSummary | null; pagination: PaginationMeta }> {
   try {
-    try {
-      return await fetchOrdersFromMasterSearch(filters, globalFilters, page, pageSize)
-    } catch (masterSearchError) {
-      if (import.meta.env.DEV) {
-        console.warn('[fetchOrders] Master-search failed, falling back to PTL orders API:', masterSearchError)
-      }
-    }
-
-    // Resolve branch context if not provided
-    const resolvedLocationId = await resolveOrdersContext(globalFilters)
-    const effectiveFilters: GlobalFilters = {
-      ...globalFilters,
-      locationId: globalFilters.locationId || resolvedLocationId || undefined,
-    }
-
-    // Fetch custom data template in parallel (non-blocking)
-    const customDataTemplatePromise = getCustomDataTemplate().catch(() => [])
-
-    const params = buildOrdersListParams(filters, outboundOption, effectiveFilters, page, pageSize)
-    const queryString = new URLSearchParams(
-      Object.entries(params).reduce((acc, [key, value]) => {
-        if (value !== undefined && value !== null) {
-          acc[key] = String(value)
-        }
-        return acc
-      }, {} as Record<string, string>)
-    ).toString()
-
-    const baseUrl = buildFtTmsUrl('/ptl-booking/api/v1/order/myOrders')
-    const response = await ftTmsFetch(`${baseUrl}?${queryString}`)
-    const data: OrdersListResponse = await response.json()
-
-    if (!data || data.success === false) {
-      throw new Error('API returned failure status')
-    }
-
-    const { orders: extractedOrders, summary: extractedSummary, pagination: extractedPagination } =
-      extractOrdersPayload(data)
-
-    // Get custom data template (may be empty array if fetch failed)
-    const customDataFields = await customDataTemplatePromise
-
-    // Normalize orders array with error handling
-    const rawOrders = extractedOrders
-    const normalizedOrders: OrderRow[] = []
-    let skippedCount = 0
-
-    for (const order of rawOrders) {
-      const normalized = normalizeOrderRow(order, customDataFields)
-      if (normalized) {
-        normalizedOrders.push(normalized)
-      } else {
-        skippedCount++
-      }
-    }
-
-    if (skippedCount > 0 && import.meta.env.DEV) {
-      console.warn(`[fetchOrders] Skipped ${skippedCount} invalid orders out of ${rawOrders.length} total`)
-    }
-
-    // Enrich orders with timeline data (stage/milestone/dispatchDate) when missing
-    const enrichedOrders = await enrichOrdersFromTimeline(normalizedOrders)
-
-    // Build summary if not provided
-    let summary = extractedSummary || null
-    if (!summary && enrichedOrders.length > 0) {
-      summary = {
-        total: enrichedOrders.length,
-        inbound: enrichedOrders.filter(o => o.tripType === 'Inbound').length,
-        outbound: enrichedOrders.filter(o => o.tripType === 'Outbound').length,
-        ftl: enrichedOrders.filter(o => o.tripType === 'FTL').length,
-        ptl: enrichedOrders.filter(o => o.tripType === 'PTL').length,
-        deliveryDelayed: enrichedOrders.filter(o => o.deliveryStatus === 'delayed').length,
-      }
-    }
-
-    return {
-      orders: enrichedOrders,
-      summary,
-      pagination: extractedPagination || {
-        page: 1,
-        pageSize: 50,
-        total: enrichedOrders.length,
-        totalPages: Math.ceil(enrichedOrders.length / pageSize),
-      },
-    }
+    return await fetchOrdersFromMasterSearch(filters, globalFilters, page, pageSize)
   } catch (error) {
     console.error('Error fetching orders:', error)
+    // For PermissionError, provide helpful message but still throw since orders are critical
+    if (error instanceof Error && error.name === 'PermissionError') {
+      console.warn('Orders API permissions denied - user may need additional permissions for PTL orders')
+    }
     throw error
   }
 }
@@ -841,7 +698,7 @@ export async function fetchOrders(
  */
 export async function fetchOrderDetails(orderId: string): Promise<OrderDetailsResponse['data']> {
   try {
-    const baseUrl = buildFtTmsUrl(`/ptl-booking/api/v1/order/${orderId}/details`)
+    const baseUrl = buildFtTmsUrl(`/api/ptl-booking/api/v1/order/${orderId}/details`)
     const response = await ftTmsFetch(baseUrl)
     const data: OrderDetailsResponse = await response.json()
 
@@ -859,29 +716,12 @@ export async function fetchOrderDetails(orderId: string): Promise<OrderDetailsRe
 /**
  * Fetch order timeline
  */
-export async function fetchOrderTimeline(orderId: string): Promise<OrderTimelineResponse['data']> {
-  try {
-    const baseUrl = buildFtTmsUrl(`/ptl-booking/api/v1/order/${orderId}/timeline`)
-    const response = await ftTmsFetch(baseUrl)
-    const data: OrderTimelineResponse = await response.json()
-
-    if (!data.success) {
-      throw new Error('API returned failure status')
-    }
-
-    return data.data
-  } catch (error) {
-    console.error(`Error fetching order timeline for ${orderId}:`, error)
-    throw error
-  }
-}
-
 /**
  * Fetch order comments
  */
 export async function fetchOrderComments(orderId: string): Promise<OrderComment[]> {
   try {
-    const baseUrl = buildFtTmsUrl(`/ptl-booking/api/v1/order/${orderId}/comments`)
+    const baseUrl = buildFtTmsUrl(`/api/ptl-booking/api/v1/order/${orderId}/comments`)
     const response = await ftTmsFetch(baseUrl)
     const data: OrderCommentsResponse = await response.json()
 
@@ -899,23 +739,6 @@ export async function fetchOrderComments(orderId: string): Promise<OrderComment[
 /**
  * Fetch comment templates
  */
-export async function fetchCommentTemplates(): Promise<CommentTemplate[]> {
-  try {
-    const baseUrl = buildFtTmsUrl('/ptl-booking/api/v1/order/comments/templates')
-    const response = await ftTmsFetch(baseUrl)
-    const data: CommentTemplatesResponse = await response.json()
-
-    if (!data.success) {
-      throw new Error('API returned failure status')
-    }
-
-    return data.data.templates || []
-  } catch (error) {
-    console.error('Error fetching comment templates:', error)
-    throw error
-  }
-}
-
 /**
  * Add a comment to an order
  */
@@ -924,7 +747,7 @@ export async function addOrderComment(
   comment: AddCommentRequest
 ): Promise<OrderComment> {
   try {
-    const baseUrl = buildFtTmsUrl(`/ptl-booking/api/v1/order/${orderId}/comments`)
+    const baseUrl = buildFtTmsUrl(`/api/ptl-booking/api/v1/order/${orderId}/comments`)
     const response = await ftTmsFetch(baseUrl, {
       method: 'POST',
       body: JSON.stringify(comment),

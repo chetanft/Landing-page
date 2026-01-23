@@ -3,6 +3,8 @@ import { TokenManager } from '../auth/tokenManager'
 
 // Real API integration for FreightTiger TMS
 const normalizeBaseUrl = (baseUrl: string) => baseUrl.replace(/\/+$/, '')
+const isBranchFteid = (value?: string | null) =>
+  Boolean(value && (value.startsWith('BRH-') || value.startsWith('BRN-')))
 
 const getPlanningBaseUrl = () => {
   const override = import.meta.env.VITE_PLANNING_API_BASE_URL
@@ -15,52 +17,103 @@ const getPlanningBaseUrl = () => {
   return 'https://planning-engine-service.freighttiger.com/planning-engine-service/v1/api'
 }
 
-const planningFetch = async (path: string, options: RequestInit = {}) => {
+type PlanningAuthPreference = 'auto' | 'desk' | 'login'
+
+const ORDERS_MASTER_SEARCH_PATH = '/orders/master-search'
+
+const selectPlanningToken = (path: string, preference: PlanningAuthPreference) => {
   const deskToken = TokenManager.getDeskToken()
-  const accessToken = TokenManager.getAccessToken()
-  const token = deskToken || accessToken
-  const headers: Record<string, string> = {
-    'Accept': 'application/json',
-    'Content-Type': 'application/json',
-    ...(options.headers || {})
-  }
-  if (token) {
-    headers.Authorization = `Bearer ${token}`
-    if (import.meta.env.DEV) {
-      const source = deskToken ? 'desk' : 'login'
-      console.log(`[planningFetch] Using ${source} token (len=${token.length})`)
+  const loginToken = TokenManager.getAccessToken()
+
+  if (preference === 'desk') {
+    return {
+      token: deskToken || loginToken || null,
+      source: deskToken ? 'desk' : (loginToken ? 'login' : 'none')
     }
-  } else if (import.meta.env.DEV) {
-    console.warn('[planningFetch] No token available for planning API request')
+  }
+  if (preference === 'login') {
+    return {
+      token: loginToken || deskToken || null,
+      source: loginToken ? 'login' : (deskToken ? 'desk' : 'none')
+    }
   }
 
-  const userContext = resolveUserContext(token) ?? TokenManager.getUserContext()
-  if (userContext?.orgId) {
-    headers['X-FT-ORGID'] = userContext.orgId
-  }
-  if (userContext?.userId) {
-    headers['X-FT-USERID'] = userContext.userId
-  }
-  const branchCode = userContext?.branchId || import.meta.env.VITE_FT_TMS_BRANCH_FTEID || ''
-  if (branchCode) {
-    headers['branch-code'] = branchCode
+  // Orders master search requires desk token with permissions
+  const requiresDeskToken = path.includes(ORDERS_MASTER_SEARCH_PATH)
+  if (requiresDeskToken) {
+    return {
+      token: deskToken || loginToken || null,
+      source: deskToken ? 'desk' : (loginToken ? 'login' : 'none')
+    }
   }
 
-  const url = `${getPlanningBaseUrl()}${path}`
-  if (import.meta.env.DEV) {
-    console.log('[planningFetch] Calling planning API:', url)
+  const preferDesk = path.startsWith('/orders/')
+  if (preferDesk && deskToken) return { token: deskToken, source: 'desk' }
+  if (loginToken) return { token: loginToken, source: 'login' }
+  if (deskToken) return { token: deskToken, source: 'desk' }
+  return { token: null, source: 'none' }
+}
+
+const planningFetch = async (
+  path: string,
+  options: RequestInit = {},
+  preference: PlanningAuthPreference = 'auto'
+) => {
+  const baseUrl = getPlanningBaseUrl()
+
+  const doFetch = async (baseUrl: string, token: string | null, source: string) => {
+    const url = `${baseUrl}${path}`
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string> || {})
+    }
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+      if (import.meta.env.DEV) {
+        console.log(`[planningFetch] Using ${source} token (len=${token.length})`)
+      }
+    } else if (import.meta.env.DEV) {
+      console.warn('[planningFetch] No token available for planning API request')
+    }
+
+    const userContext = resolveUserContext(token || undefined) ?? TokenManager.getUserContext()
+    if (userContext?.orgId) {
+      headers['X-FT-ORGID'] = userContext.orgId
+    }
+    if (userContext?.userId) {
+      headers['X-FT-USERID'] = userContext.userId
+    }
+    if (!path.includes(ORDERS_MASTER_SEARCH_PATH)) {
+      const existingBranchHeader = Object.prototype.hasOwnProperty.call(headers, 'branch-code')
+      if (!existingBranchHeader) {
+        const branchCode = userContext?.branchId || import.meta.env.VITE_FT_TMS_BRANCH_FTEID || ''
+        if (isBranchFteid(branchCode)) {
+          headers['branch-code'] = branchCode
+        }
+      }
+    }
+
+    if (import.meta.env.DEV) {
+      console.log('[planningFetch] Calling planning API:', url)
+    }
+
+    return fetch(url, {
+      ...options,
+      method: options.method ?? 'GET',
+      headers,
+      credentials: 'include'
+    })
   }
 
-  return fetch(url, {
-    ...options,
-    method: options.method ?? 'GET',
-    headers,
-    credentials: 'include'
-  })
+  const primary = selectPlanningToken(path, preference)
+  return doFetch(baseUrl, primary.token, primary.source)
 }
 
 const BASE_URL = buildFtTmsUrl('/planning-engine-service/v1/api')
-const ACCESS_CONTROL_BASE_URL = buildFtTmsUrl('/access-control/v1')
+const ACCESS_CONTROL_BASE_URL = buildFtTmsUrl('/api/access-control/v1')
+const ENTITY_SERVICE_BASE_URL = buildFtTmsUrl('/api/entity-service/v1')
+const EQS_BASE_URL = buildFtTmsUrl('/api/eqs/v1')
 
 // Types for API responses
 export interface UserSettingsResponse {
@@ -141,6 +194,18 @@ export interface BatchSearchResponse {
   timestamp: string
 }
 
+export interface BatchSearchRequest {
+  page: number
+  size: number
+  group_fteid?: string | null
+  branch_fteid?: string | null
+  filters?: Array<{
+    field: string
+    operator: string
+    value: string[] | number[] | string | number | null
+  }>
+}
+
 export interface OrdersMasterSearchRequest {
   page: number
   size: number
@@ -178,10 +243,26 @@ export interface CompanyHierarchyResponse {
     total_branches: Array<{
       fteid: string
       name: string
+      company_fteid?: string
+      company_name?: string
+      company_code?: string
+      company_status?: string
       short_code?: string
       old_branch_id?: number
     }>
     groups: any[]
+    company?: {
+      fteid?: string
+      name?: string
+      company_code?: string
+      status?: string
+    }
+    parent_company?: {
+      fteid?: string
+      name?: string
+      company_code?: string
+      status?: string
+    }
   }
   message: string
   timestamp: string
@@ -195,11 +276,72 @@ export interface PermissionsResponse {
   }>
 }
 
+export interface CompanyDetailsResponse {
+  success: boolean
+  data: Array<{
+    fteid: string
+    name?: string
+    company_code?: string
+    status?: string
+    is_active?: boolean
+  }>
+}
+
+export interface AccessRoleResponse {
+  success: boolean
+  data: {
+    role_id: string
+    name: string
+    description?: string
+    entity_type?: string[]
+    permissions?: string[]
+    organization_id?: string
+    group_id?: string
+    verified?: boolean
+  }
+}
+
+const accessControlFetch = async (path: string, options: RequestInit = {}) => {
+  const deskToken = TokenManager.getDeskToken() || TokenManager.getAccessToken()
+  if (!deskToken) {
+    throw new Error('No token available for access-control request')
+  }
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> || {})
+  }
+  headers.Authorization = `Bearer ${deskToken}`
+  headers.token = deskToken
+
+  const userContext = resolveUserContext(deskToken) ?? TokenManager.getUserContext()
+  if (userContext?.orgId) {
+    headers['X-FT-ORGID'] = userContext.orgId
+  }
+  if (userContext?.userId) {
+    headers['X-FT-USERID'] = userContext.userId
+  }
+
+  const response = await fetch(`${ACCESS_CONTROL_BASE_URL}${path}`, {
+    ...options,
+    method: options.method ?? 'GET',
+    headers,
+    credentials: 'include'
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => 'Unknown error')
+    throw new Error(`Access-control request failed: ${response.status} ${response.statusText} ${errorText}`)
+  }
+
+  return response
+}
+
 // API Service functions
 export const realApiService = {
   // User Settings
   async getUserSettings(): Promise<UserSettingsResponse> {
-    const response = await planningFetch('/configurations/user-settings')
+    const response = await planningFetch('/configurations/user-settings', {}, 'login')
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error')
       if (import.meta.env.DEV) {
@@ -211,19 +353,43 @@ export const realApiService = {
       }
       throw new Error(`Failed to fetch user settings: ${response.status} ${response.statusText}`)
     }
-    return response.json()
+    const data: UserSettingsResponse = await response.json()
+    const branchFteid = data?.data?.lastSelectedBranch
+    if (branchFteid && isBranchFteid(branchFteid)) {
+      const currentContext = TokenManager.getUserContext()
+      if (currentContext && currentContext.branchId !== branchFteid) {
+        const updatedContext = { ...currentContext, branchId: branchFteid }
+        TokenManager.setUserContext(updatedContext)
+        if (import.meta.env.DEV) {
+          console.log('[getUserSettings] Cached branchId from user settings:', branchFteid)
+        }
+      }
+    }
+    return data
   },
 
   // Order Status Counts
-  async getOrderStatusCounts(branchFteid: string): Promise<OrderStatusCountsResponse> {
-    const response = await planningFetch(`/orders/status-counts?branch_fteid=${branchFteid}`)
+  async getOrderStatusCounts(branchFteid?: string): Promise<OrderStatusCountsResponse> {
+    const candidateBranch = branchFteid
+      || TokenManager.getUserContext()?.branchId
+      || import.meta.env.VITE_FT_TMS_BRANCH_FTEID
+      || ''
+    const resolvedBranch = isBranchFteid(candidateBranch) ? candidateBranch : ''
+
+    const path = resolvedBranch
+      ? `/orders/status-counts?branch_fteid=${encodeURIComponent(resolvedBranch)}`
+      : '/orders/status-counts'
+
+    const response = await planningFetch(
+      path,
+      resolvedBranch ? {} : { headers: { 'branch-code': '' } }
+    )
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error')
       if (import.meta.env.DEV) {
         console.error('[getOrderStatusCounts] Planning API error:', {
           status: response.status,
           statusText: response.statusText,
-          branchFteid,
           error: errorText
         })
       }
@@ -234,7 +400,7 @@ export const realApiService = {
 
   // Custom Data Template
   async getCustomDataTemplate(entity: string = 'order'): Promise<CustomDataTemplateResponse> {
-    const response = await planningFetch(`/custom-data-template/${entity}`)
+    const response = await planningFetch(`/custom-data-template/${entity}`, {}, 'login')
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error')
       if (import.meta.env.DEV) {
@@ -251,15 +417,19 @@ export const realApiService = {
   },
 
   // Batch Search
-  async searchBatches(page: number = 1, pageSize: number = 10): Promise<BatchSearchResponse> {
-    const response = await planningFetch(`/batches/master-search?page=${page}&pageSize=${pageSize}`)
+  async searchBatches(payload: BatchSearchRequest): Promise<BatchSearchResponse> {
+    const response = await planningFetch('/batches/master-search', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }, 'login')
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error')
       if (import.meta.env.DEV) {
         console.error('[searchBatches] Planning API error:', {
           status: response.status,
           statusText: response.statusText,
-          error: errorText
+          error: errorText,
+          payload
         })
       }
       throw new Error(`Failed to fetch batches: ${response.status} ${response.statusText}`)
@@ -269,10 +439,10 @@ export const realApiService = {
 
   // Orders Master Search
   async searchOrdersMaster(payload: OrdersMasterSearchRequest): Promise<OrdersMasterSearchResponse> {
-    const response = await planningFetch('/orders/master-search', {
+    const response = await planningFetch(ORDERS_MASTER_SEARCH_PATH, {
       method: 'POST',
       body: JSON.stringify(payload)
-    })
+    }, 'desk')
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error')
       if (import.meta.env.DEV) {
@@ -289,7 +459,31 @@ export const realApiService = {
 
   // Company Hierarchy
   async getCompanyHierarchy(): Promise<CompanyHierarchyResponse> {
-    const response = await planningFetch('/external-services/eqs/company/child')
+    let branchFteid = TokenManager.getUserContext()?.branchId
+      || import.meta.env.VITE_FT_TMS_BRANCH_FTEID
+      || ''
+    if (!isBranchFteid(branchFteid)) {
+      try {
+        const userSettings = await realApiService.getUserSettings()
+        const lastBranch = userSettings?.data?.lastSelectedBranch
+        if (isBranchFteid(lastBranch)) {
+          branchFteid = lastBranch
+        }
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.warn('[getCompanyHierarchy] Failed to resolve branch from user settings:', error)
+        }
+      }
+    }
+    if (!isBranchFteid(branchFteid)) {
+      throw new Error('No valid branch selected for company hierarchy request')
+    }
+
+    const response = await planningFetch(
+      `/external-services/eqs/company/child?branch_fteid=${encodeURIComponent(branchFteid)}`,
+      {},
+      'desk'
+    )
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error')
       if (import.meta.env.DEV) {
@@ -306,7 +500,7 @@ export const realApiService = {
 
   // Selected Orders Views
   async getSelectedOrdersViews(): Promise<any> {
-    const response = await planningFetch('/views/selected/orders')
+    const response = await planningFetch('/views/selected/orders', {}, 'login')
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error')
       if (import.meta.env.DEV) {
@@ -323,8 +517,25 @@ export const realApiService = {
 
   // Access Control Permissions
   async getPermissions(): Promise<PermissionsResponse> {
-    const response = await ftTmsFetch(`${ACCESS_CONTROL_BASE_URL}/accessControl/permissions`)
-    if (!response.ok) throw new Error('Failed to fetch permissions')
+    const response = await accessControlFetch('/accessControl/permissions')
+    return response.json()
+  },
+
+  // Access Control Role Details
+  async getRoleDetails(roleFteid: string): Promise<AccessRoleResponse> {
+    const response = await accessControlFetch(`/accessControl/roles/fteid/${encodeURIComponent(roleFteid)}`)
+    return response.json()
+  },
+
+  // Company Details (Entity Service, login token)
+  async getCompanyDetailsEntityService(companyFteid: string): Promise<CompanyDetailsResponse> {
+    const response = await ftTmsFetch(`${ENTITY_SERVICE_BASE_URL}/company/${encodeURIComponent(companyFteid)}`)
+    return response.json()
+  },
+
+  // Company Details (EQS, desk token)
+  async getCompanyDetailsEqs(companyFteid: string): Promise<CompanyDetailsResponse> {
+    const response = await ftTmsFetch(`${EQS_BASE_URL}/company/${encodeURIComponent(companyFteid)}`)
     return response.json()
   }
 }

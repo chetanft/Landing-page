@@ -114,6 +114,13 @@ export class AuthenticationError extends Error {
   }
 }
 
+export class PermissionError extends Error {
+  constructor(message: string, public statusCode?: number) {
+    super(message)
+    this.name = 'PermissionError'
+  }
+}
+
 export class AuthApiService {
   // Use proxy path if available (when FT_TMS_API_BASE_URL is set), otherwise use direct URL
   // In development with proxy: /__ft_tms/api/authentication/v1/auth/login
@@ -207,7 +214,8 @@ export class AuthApiService {
 
       // Use provided uniqueId/appId or fall back to environment variables
       const appId = credentials.appId || this.APP_ID
-      const dynamicId = `${Date.now()}${crypto.randomUUID()}`
+      const generatedId = `${Date.now()}${crypto.randomUUID()}`
+      const uniqueId = (credentials.uniqueId || '').trim() || generatedId
 
       const encryptPassword = (userName: string, plainPassword: string, dynamicSeed: string) => {
         // FT app uses: SHA256(username + dynamicId) as key, AES encrypts password
@@ -215,10 +223,15 @@ export class AuthApiService {
         return CryptoJS.AES.encrypt(plainPassword, key).toString()
       }
 
+      const isEncryptedPassword = credentials.password.startsWith('U2FsdGVkX1')
+      const passwordPayload = (isEncryptedPassword && credentials.uniqueId)
+        ? credentials.password
+        : encryptPassword(username, credentials.password, uniqueId)
+
       // Build JSON body (matches FT app)
       const bodyPayload = {
         username,
-        password: encryptPassword(username, credentials.password, dynamicId),
+        password: passwordPayload,
         grant_type: 'password',
         app_id: appId
       }
@@ -229,7 +242,7 @@ export class AuthApiService {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         'Cache-Control': 'no-cache',
-        'x-ft-unique-id': dynamicId
+        'x-ft-unique-id': uniqueId
       }
 
       const response = await fetch(this.getBaseUrl(), {
@@ -249,8 +262,7 @@ export class AuthApiService {
         || data.token
         || data.data?.access_token
         || data.data?.token
-        || authToken
-      const chosenToken = authToken || accessToken
+      const chosenToken = accessToken || authToken
       const refreshToken = data.refresh_token
         || data.refreshToken
         || data.data?.refresh_token
@@ -270,7 +282,7 @@ export class AuthApiService {
         const tokenInfo = {
           accessTokenLen: accessToken ? accessToken.length : 0,
           authTokenLen: authToken ? authToken.length : 0,
-          chosen: authToken ? 'auth_token' : 'access_token'
+          chosen: accessToken ? 'access_token' : 'auth_token'
         }
         console.log('[AuthApiService] login token lengths:', tokenInfo)
       }
@@ -391,7 +403,11 @@ export class AuthApiService {
       throw new AuthenticationError('No login token available for desks')
     }
 
-    const response = await fetch(buildApiUrl('/api/entity-service/v1/desk'), {
+    const url = buildApiUrl('/api/entity-service/v1/desk')
+    if (import.meta.env.DEV) {
+      console.log('[AuthApiService] Calling getDesks API:', url)
+    }
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
@@ -414,7 +430,11 @@ export class AuthApiService {
       throw new AuthenticationError('No login token available for desk token')
     }
 
-    const response = await fetch(buildAuthApiUrl(`/api/authentication/v1/auth/token/desk/${deskFteid}`), {
+    const url = buildAuthApiUrl(`/api/authentication/v1/auth/token/desk/${deskFteid}`)
+    if (import.meta.env.DEV) {
+      console.log('[AuthApiService] Calling getDeskToken API:', { url, deskFteid })
+    }
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',

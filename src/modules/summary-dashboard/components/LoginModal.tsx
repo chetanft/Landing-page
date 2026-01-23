@@ -178,7 +178,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 disabled={isLoading}
                 onClick={() => setShowPassword(prev => !prev)}
               >
-                <Typography variant="body-small-regular" style={{ color: 'var(--color-primary)' }}>
+                <Typography variant="body-small-regular" style={{ color: 'var(--primary)' }}>
                   {showPassword ? 'Hide password' : 'Show password'}
                 </Typography>
               </Button>
@@ -216,7 +216,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 console.log('Forgot password clicked')
               }}
             >
-              <Typography variant="body-small-regular" style={{ color: 'var(--color-primary)' }}>
+              <Typography variant="body-small-regular" style={{ color: 'var(--primary)' }}>
                 Forgot password?
               </Typography>
             </Button>

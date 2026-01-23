@@ -32,23 +32,23 @@ export interface IndentsApiResponse {
   data?: IndentItem[]
 }
 
+export interface IndentPartnerOption {
+  value: string
+  label: string
+}
+
 /**
  * Fetch indents count from the cyclops API
  */
 export const fetchIndentsCount = async (globalFilters: GlobalFilters): Promise<IndentItem[]> => {
-  try {
-    return await fetchIndentsCountFromAPI(globalFilters)
-  } catch (error) {
-    console.warn('Failed to fetch from real indents API, using fallback data:', error)
-    return await fetchIndentsCountFallback()
-  }
+  return fetchIndentsCountFromAPI(globalFilters)
 }
 
 /**
  * Real API call implementation for indents
  */
 export const fetchIndentsCountFromAPI = async (globalFilters: GlobalFilters): Promise<IndentItem[]> => {
-  const baseUrl = buildFtTmsUrl('/cyclops/indent/consignor/list/count')
+  const baseUrl = buildFtTmsUrl('/api/cyclops/indent/consignor/list/count')
 
   // Format dates for the API (assuming similar format as journey API)
   const params = new URLSearchParams()
@@ -139,92 +139,59 @@ export const fetchIndentsCountFromAPI = async (globalFilters: GlobalFilters): Pr
   }
 }
 
-/**
- * Fallback function with mock indents data
- */
-const fetchIndentsCountFallback = async (): Promise<IndentItem[]> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 300))
+const fetchIndentPartners = async (path: string): Promise<IndentPartnerOption[]> => {
+  const baseUrl = buildFtTmsUrl(path)
+  const deskToken = TokenManager.getDeskToken()
+  const token = deskToken || TokenManager.getAccessToken()
 
-  // Mock data based on the provided API response
-  return [
-    {
-      "count": 0,
-      "text": "Scheduled",
-      "key": "SCHEDULED"
-    },
-    {
-      "count": 34,
-      "text": "Open",
-      "key": "OPEN",
-      "child": [
-        {
-          "count": 4,
-          "text": "Pending Approval",
-          "key": "PENDING_APPROVAL"
-        },
-        {
-          "break_up": {
-            "bidding": 0,
-            "indent": 19
-          },
-          "count": 19,
-          "text": "Pending Acceptance",
-          "key": "TRANSPORTER_SELECTION_PENDING"
-        },
-        {
-          "overdue": 0,
-          "count": 3,
-          "text": "In Assignment",
-          "key": "VEHICLE_PLACEMENT_IN_PROGRESS"
-        },
-        {
-          "overdue": 0,
-          "count": 8,
-          "text": "In Reporting",
-          "key": "VEHICLE_REPORTING_IN_PROGRESS"
-        }
-      ]
-    },
-    {
-      "count": 52693,
-      "text": "Expired",
-      "key": "EXPIRED"
-    },
-    {
-      "count": 20,
-      "text": "Partially Fulfilled",
-      "key": "PARTIALLY_CLOSED"
-    },
-    {
-      "count": 5765,
-      "text": "Cancelled",
-      "key": "CANCELLED"
-    },
-    {
-      "count": 71542,
-      "text": "Fulfilled",
-      "key": "COMPLETELY_CLOSED"
-    },
-    {
-      "count": 2,
-      "text": "Drafts",
-      "key": "DRAFT"
-    },
-    {
-      "count": 0,
-      "text": "Approval Rejection",
-      "key": "APPROVAL_REJECTION"
-    },
-    {
-      "count": 228,
-      "text": "Vehicle Rejected",
-      "key": "REJECTED"
-    },
-    {
-      "count": 790,
-      "text": "Rejected By Transporter",
-      "key": "REJECTED_BY_TRANSPORTER"
+  const headers: Record<string, string> = {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json'
+  }
+
+  if (token) {
+    headers['token'] = token
+    if (import.meta.env.DEV) {
+      const source = deskToken ? 'desk token' : 'login token'
+      console.log(`[fetchIndentPartners] Using ${source} header: ${token.substring(0, 30)}... (len=${token.length})`)
     }
-  ]
+  } else if (import.meta.env.DEV) {
+    console.warn('[fetchIndentPartners] No token available from storage')
+  }
+
+  const response = await fetch(baseUrl, {
+    method: 'GET',
+    credentials: 'include',
+    headers,
+  })
+
+  if (!response.ok) {
+    let errorMessage = `Indent partner request failed (${response.status})`
+    try {
+      const errorBody = await response.clone().json()
+      errorMessage = errorBody.message || errorBody.error || errorMessage
+    } catch {
+      // Ignore parse errors
+    }
+    throw new Error(errorMessage)
+  }
+
+  const data = await response.json()
+  if (data?.success === false) {
+    throw new Error('Indent partner API returned failure status')
+  }
+
+  const items = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
+  return items.map((item: any) => ({
+    value: String(item.fteid || item.id || ''),
+    label: String(item.name || item.label || item.text || '')
+  })).filter(item => item.value && item.label)
+}
+
+export const fetchIndentConsignees = async (): Promise<IndentPartnerOption[]> => {
+  return fetchIndentPartners('/api/cyclops/indent/dashboard/consignee')
+}
+
+export const fetchIndentTransporters = async (): Promise<IndentPartnerOption[]> => {
+  return fetchIndentPartners('/api/cyclops/indent/dashboard/transporters')
 }

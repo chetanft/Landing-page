@@ -51,7 +51,12 @@ export const useCustomDataTemplate = (entity: string = 'order') => {
 export const useBatchData = (page: number = 1, pageSize: number = 10) => {
   return useQuery({
     queryKey: ['batchData', page, pageSize],
-    queryFn: () => realApiService.searchBatches(page, pageSize),
+    queryFn: () => realApiService.searchBatches({
+      page,
+      size: pageSize,
+      group_fteid: null,
+      filters: []
+    }),
     staleTime: 2 * 60 * 1000, // 2 minutes
     retry: 2,
     enabled: !JOURNEY_COUNT_ONLY_MODE

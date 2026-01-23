@@ -155,12 +155,7 @@ export const fetchShipmentMetrics = async (globalFilters: GlobalFilters): Promis
     console.log('[fetchShipmentMetrics] Calling real shipments API')
   }
 
-  try {
-    return await fetchShipmentMetricsFromAPI(globalFilters)
-  } catch (error) {
-    console.warn('Failed to fetch from real shipments API, using fallback data:', error)
-    return await fetchShipmentMetricsFallback(globalFilters)
-  }
+  return fetchShipmentMetricsFromAPI(globalFilters)
 }
 
 /**
@@ -171,7 +166,7 @@ const fetchShipmentSpecificBucketSummary = async (
   globalFilters: GlobalFilters
 ): Promise<ShipmentSpecificBucketSummary | null> => {
   try {
-    const baseUrl = buildFtTmsUrl('/ptl-v2/api/v1/shipment/myShipmentSpecificBucketSummary')
+    const baseUrl = buildFtTmsUrl('/api/ptl-v2/api/v1/shipment/myShipmentSpecificBucketSummary')
 
     const fromBookingDate = globalFilters.dateRange.start.getTime()
     const toBookingDate = globalFilters.dateRange.end.getTime()
@@ -190,6 +185,10 @@ const fetchShipmentSpecificBucketSummary = async (
     // Add transporter filter if specified
     if (globalFilters.transporterId) {
       params.append('transporter_fteid', globalFilters.transporterId)
+    }
+
+    if (globalFilters.consigneeId) {
+      params.append('consignee_fteid', globalFilters.consigneeId)
     }
 
     // Add priority filter if specified
@@ -235,7 +234,7 @@ const fetchShipmentPodSummary = async (
   globalFilters: GlobalFilters
 ): Promise<{ pod_available: string; pod_pending: string } | null> => {
   try {
-    const baseUrl = buildFtTmsUrl('/ptl-v2/api/v1/shipment/myShipments')
+    const baseUrl = buildFtTmsUrl('/api/ptl-v2/api/v1/shipment/myShipments')
     const fromBookingDate = globalFilters.dateRange.start.getTime()
     const toBookingDate = globalFilters.dateRange.end.getTime()
 
@@ -256,6 +255,9 @@ const fetchShipmentPodSummary = async (
       }
       if (globalFilters.transporterId) {
         params.append('transporter_fteid', globalFilters.transporterId)
+      }
+      if (globalFilters.consigneeId) {
+        params.append('consignee_fteid', globalFilters.consigneeId)
       }
 
       return `${baseUrl}?${params.toString()}`
@@ -293,7 +295,7 @@ export const fetchShipmentMetricsFromAPI = async (globalFilters: GlobalFilters):
     throw new Error('Date range is required for shipments API')
   }
 
-  const baseUrl = buildFtTmsUrl('/ptl-v2/api/v1/shipment/myShipmentBucketSummary')
+  const baseUrl = buildFtTmsUrl('/api/ptl-v2/api/v1/shipment/myShipmentBucketSummary')
 
   // Convert dates to timestamp format (milliseconds)
   const fromBookingDate = globalFilters.dateRange.start.getTime()
@@ -312,6 +314,10 @@ export const fetchShipmentMetricsFromAPI = async (globalFilters: GlobalFilters):
   // Add transporter filter if specified (PTL transporters)
   if (globalFilters.transporterId) {
     params.append('transporter_fteid', globalFilters.transporterId)
+  }
+
+  if (globalFilters.consigneeId) {
+    params.append('consignee_fteid', globalFilters.consigneeId)
   }
 
   // Add priority filter if specified
@@ -393,144 +399,6 @@ export const fetchShipmentMetricsFromAPI = async (globalFilters: GlobalFilters):
     console.error('Error fetching shipment metrics from API:', error)
     throw error
   }
-}
-
-/**
- * Fallback function with mock shipment data
- */
-const fetchShipmentMetricsFallback = async (globalFilters?: GlobalFilters): Promise<TabData> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 300))
-
-  const mockApiResponse: ShipmentSummaryApiResponse = {
-    success: true,
-    data: {
-      bucket_summary: {},
-      milestone_summary: {
-        REGISTERED: 10,
-        BOOKED: 45,
-        PICKED_UP: 23,
-        IN_TRANSIT: 67,
-        OUT_FOR_DELIVERY: 12,
-        DELIVERED: 234,
-        EXCEPTIONS: 8,
-        AWAITING_UPDATES: 4,
-        NO_UPDATES: 6
-      }
-    }
-  }
-
-  // Create mock analytics for testing
-  const mockAnalyticsMap = new Map<string, ShipmentSpecificBucketSummary | null>([
-    ['BOOKED', {
-      transit_status_summary: {
-        indeterminate: 1,
-        delayed: 5,
-        on_time: 39
-      },
-      pod_summary: {
-        pod_available: '0',
-        pod_pending: '45'
-      },
-      priority_summary: {
-        high: 8,
-        standard: 35,
-        low: 2
-      }
-    }],
-    ['PICKED_UP', {
-      transit_status_summary: {
-        indeterminate: 0,
-        delayed: 3,
-        on_time: 20
-      },
-      pod_summary: {
-        pod_available: '0',
-        pod_pending: '23'
-      },
-      priority_summary: {
-        high: 4,
-        standard: 18,
-        low: 1
-      }
-    }],
-    ['IN_TRANSIT', {
-      transit_status_summary: {
-        indeterminate: 3,
-        delayed: 15,
-        on_time: 49
-      },
-      pod_summary: {
-        pod_available: '0',
-        pod_pending: '67'
-      },
-      priority_summary: {
-        high: 12,
-        standard: 50,
-        low: 5
-      }
-    }],
-    ['OUT_FOR_DELIVERY', {
-      transit_status_summary: {
-        indeterminate: 0,
-        delayed: 2,
-        on_time: 10
-      },
-      pod_summary: {
-        pod_available: '5',
-        pod_pending: '7'
-      },
-      priority_summary: {
-        high: 3,
-        standard: 8,
-        low: 1
-      }
-    }],
-    ['DELIVERED', {
-      transit_status_summary: {
-        indeterminate: 0,
-        delayed: 33,
-        on_time: 201
-      },
-      pod_summary: {
-        pod_available: '200',
-        pod_pending: '34'
-      },
-      priority_summary: {
-        high: 45,
-        standard: 180,
-        low: 9
-      }
-    }],
-    ['EXCEPTION', {
-      transit_status_summary: {
-        indeterminate: 2,
-        delayed: 6,
-        on_time: 0
-      },
-      pod_summary: {
-        pod_available: '0',
-        pod_pending: '8'
-      },
-      priority_summary: {
-        high: 5,
-        standard: 3,
-        low: 0
-      }
-    }]
-  ])
-
-  // Mock orders data for testing
-  const mockOrdersData: OrdersBucketSummary = {
-    SERVICEABLE: 15,
-    UNSERVICEABLE: 3,
-    PROCESSING: 8,
-    BOOKED: 12,
-    FAILED: 1,
-    CANCELLED: 2
-  }
-
-  return transformShipmentDataToTabData(mockApiResponse, mockAnalyticsMap, mockOrdersData, globalFilters)
 }
 
 /**

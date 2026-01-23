@@ -34,7 +34,6 @@ export class TokenManager {
     try {
       return (
         localStorage.getItem('ft_login_token') ||
-        localStorage.getItem(this.DESK_TOKEN_KEY) ||
         localStorage.getItem(this.ACCESS_TOKEN_KEY)
       )
     } catch (error) {

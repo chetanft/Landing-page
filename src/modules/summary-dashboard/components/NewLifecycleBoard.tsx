@@ -161,7 +161,12 @@ function SectionToggle({
         variant="text"
         size="sm"
         onClick={onToggle}
-        style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-x1)' }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--spacing-x1)',
+          color: 'var(--text-secondary)'
+        }}
       >
         <Icon
           name={isExpanded ? 'chevron-up' : 'chevron-down'}
@@ -224,9 +229,10 @@ function HeaderRow({
           >
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-x2)', marginBottom: 'var(--spacing-x2)' }}>
               {iconName && <Icon name={iconName} size={14} style={{ color: 'var(--text-tertiary)', marginTop: 'calc(var(--spacing-x1) / 2)' }} />}
-              <Typography variant="body-primary-semibold" color="secondary" style={{
+              <Typography variant="body-primary-semibold" color="primary" style={{
                 fontSize: 'var(--font-size-sm)',
-                flex: 1
+                flex: 1,
+                color: 'var(--text-primary)'
               }}>
                 {stage.title}
               </Typography>

@@ -1,6 +1,7 @@
 import { Icon, Input, InputField, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Typography, Row, Col, DatePicker } from 'ft-design-system'
 import type { GlobalFilters } from '../types/metrics'
 import { useConsignors } from '../hooks/useConsignors'
+import { TokenManager } from '../auth/tokenManager'
 
 interface TitleBarProps {
   globalFilters: GlobalFilters
@@ -13,6 +14,16 @@ export default function TitleBar({ globalFilters, onFiltersChange }: TitleBarPro
   const handleLocationChange = (value: string | number) => {
     const normalizedValue = String(value ?? '')
     const selectedConsignor = consignors.find(c => c.value === normalizedValue)
+    const currentContext = TokenManager.getUserContext()
+
+    if (currentContext) {
+      const updatedContext = {
+        ...currentContext,
+        branchId: normalizedValue || ''
+      }
+      TokenManager.setUserContext(updatedContext)
+    }
+
     onFiltersChange({
       locationId: normalizedValue || undefined,
       locationName: selectedConsignor?.label || 'All Locations'

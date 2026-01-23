@@ -18,6 +18,16 @@ export interface BranchApiResponse {
   }>
 }
 
+export interface BranchChildApiResponse {
+  success: boolean
+  data: Array<{
+    fteid: string
+    name: string
+    short_code?: string | null
+    old_branch_id?: number | null
+  }>
+}
+
 const MOCK_BRANCHES: BranchOption[] = [
   { value: '', label: 'All Branches' },
   { value: 'BRN-001', label: 'Main Branch, Mumbai' },
@@ -29,17 +39,45 @@ const MOCK_BRANCHES: BranchOption[] = [
 /**
  * Fetch branches from the API for the current user's company
  */
+export const fetchBranchChildren = async (): Promise<BranchOption[]> => {
+  const childUrl = buildFtTmsUrl('/api/eqs/v1/company/get_child')
+  const childParams = new URLSearchParams({
+    page: '1',
+    size: '300',
+    q: ''
+  })
+  const childResponse = await ftTmsFetch(`${childUrl}?${childParams}`)
+  const childResult: BranchChildApiResponse = await childResponse.json()
+
+  if (childResult.success && childResult.data && childResult.data.length > 0) {
+    return [
+      { value: '', label: 'All Branches' },
+      ...childResult.data.map(branch => ({
+        value: branch.fteid,
+        label: branch.name
+      }))
+    ]
+  }
+
+  return []
+}
+
 export const fetchBranches = async (): Promise<BranchOption[]> => {
   try {
-    // Get current user's company info
-    const companyInfo = await getCompanyInfo()
+    // Prefer EQS child branches (desk-token) for complete branch list
+    const childBranches = await fetchBranchChildren()
+    if (childBranches.length > 0) {
+      return childBranches
+    }
 
+    // Fallback to company_fteid branch listing
+    const companyInfo = await getCompanyInfo()
     if (!companyInfo) {
       console.warn('No company info available, using mock data')
       return MOCK_BRANCHES
     }
 
-    const baseUrl = buildFtTmsUrl('/eqs/v1/branch')
+    const baseUrl = buildFtTmsUrl('/api/eqs/v1/branch')
     const params = new URLSearchParams({
       company_fteid: companyInfo.fteid,
       sort: '-updated_at'
@@ -49,7 +87,7 @@ export const fetchBranches = async (): Promise<BranchOption[]> => {
     const result: BranchApiResponse = await response.json()
 
     if (result.success && result.data && result.data.length > 0) {
-      const branchOptions: BranchOption[] = [
+      return [
         { value: '', label: 'All Branches' },
         ...result.data
           .filter(branch => branch.status === 'active' || branch.status === 'ACTIVE')
@@ -58,11 +96,10 @@ export const fetchBranches = async (): Promise<BranchOption[]> => {
             label: branch.name
           }))
       ]
-      return branchOptions
-    } else {
-      console.warn('API returned empty branch data, using mock data')
-      return MOCK_BRANCHES
     }
+
+    console.warn('API returned empty branch data, using mock data')
+    return MOCK_BRANCHES
   } catch (error) {
     console.error('Error fetching branches:', error)
     return MOCK_BRANCHES

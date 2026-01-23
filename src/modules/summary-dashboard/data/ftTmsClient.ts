@@ -1,5 +1,5 @@
 import { TokenManager, type UserContext } from '../auth/tokenManager'
-import { AuthenticationError } from '../auth/authApiService'
+import { AuthApiService, AuthenticationError, PermissionError, authUtils } from '../auth/authApiService'
 
 const DEFAULT_BASE_URL = '/__ft_tms'
 
@@ -68,49 +68,116 @@ export const buildFtTmsUrl = (pathOrUrl: string) => {
 
 export const ftTmsFetch = async (pathOrUrl: string, options: RequestInit = {}): Promise<Response> => {
   const url = buildFtTmsUrl(pathOrUrl)
-  
-  // Get authentication token from storage (from login API)
-  const token = TokenManager.getAccessToken()
-  const headers: Record<string, string> = {
-    'Accept': 'application/json',
-    'Content-Type': 'application/json',
-    ...(options.headers || {})
-  }
-  
-  // Most APIs use Authorization: Bearer <token> format
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-    headers['token'] = token
-    if (import.meta.env.DEV) {
-      console.log(`[ftTmsFetch] Using token: ${token.substring(0, 30)}... (length: ${token.length})`)
+  const didRetry = (options as { __retried?: boolean }).__retried === true
+  const isBranchFteid = (value?: string | null) =>
+    Boolean(value && (value.startsWith('BRH-') || value.startsWith('BRN-')))
+
+  const applyAuthHeaders = (tokenValue: string | null) => {
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
     }
-  } else {
-    if (import.meta.env.DEV) {
+
+    if (tokenValue) {
+      headers['Authorization'] = `Bearer ${tokenValue}`
+      headers['token'] = tokenValue
+      if (import.meta.env.DEV) {
+        console.log(`[ftTmsFetch] Using token: ${tokenValue.substring(0, 30)}... (length: ${tokenValue.length})`)
+      }
+    } else if (import.meta.env.DEV) {
       console.warn(`[ftTmsFetch] No token available from storage`)
     }
-  }
-  
-  // Add user context headers if available (derive from token if stored context is mock)
-  const userContext = resolveUserContext(token)
-  if (userContext) {
-    headers['X-Org-Id'] = userContext.orgId
-    headers['X-Branch-Id'] = userContext.branchId
-    headers['X-User-Role'] = userContext.userRole
-    headers['X-User-Id'] = userContext.userId
-    headers['X-FT-ORGID'] = userContext.orgId
-    headers['X-FT-USERID'] = userContext.userId
-    if (import.meta.env.DEV) {
-      console.log(`[ftTmsFetch] User context:`, { orgId: userContext.orgId, branchId: userContext.branchId, userId: userContext.userId, role: userContext.userRole })
+
+    const userContext = resolveUserContext(tokenValue)
+    if (userContext) {
+      headers['X-Org-Id'] = userContext.orgId
+      headers['X-User-Role'] = userContext.userRole
+      headers['X-User-Id'] = userContext.userId
+      headers['X-FT-ORGID'] = userContext.orgId
+      headers['X-FT-USERID'] = userContext.userId
+      if (isBranchFteid(userContext.branchId)) {
+        headers['X-Branch-Id'] = userContext.branchId
+      }
+      if (import.meta.env.DEV) {
+        console.log(`[ftTmsFetch] User context:`, { orgId: userContext.orgId, branchId: userContext.branchId, userId: userContext.userId, role: userContext.userRole })
+      }
+    } else if (import.meta.env.DEV) {
+      console.warn(`[ftTmsFetch] No user context available`)
     }
-  } else if (import.meta.env.DEV) {
-    console.warn(`[ftTmsFetch] No user context available`)
+
+    return headers
   }
-  
-  const response = await fetch(url, {
+
+  const isEqsRequest = url.includes('/api/eqs/')
+  const deskToken = isEqsRequest ? TokenManager.getDeskToken() : null
+  const usingDeskToken = Boolean(deskToken)
+
+  // Prefer desk token for EQS requests; otherwise use login/access token.
+  let token = deskToken || TokenManager.getAccessToken()
+  if (import.meta.env.DEV) {
+    try {
+      const loginToken = localStorage.getItem('ft_login_token')
+      const accessToken = localStorage.getItem('ft_access_token')
+      const source = usingDeskToken
+        ? 'ft_desk_token'
+        : (token === loginToken
+          ? 'ft_login_token'
+          : (token === accessToken ? 'ft_access_token' : 'unknown'))
+      const prefix = token ? `${token.substring(0, 10)}...` : 'none'
+      console.log('[ftTmsFetch] Token source:', { source, prefix, isEqsRequest })
+    } catch (error) {
+      console.warn('[ftTmsFetch] Unable to read token source from localStorage', error)
+    }
+  }
+  if (!usingDeskToken && token && TokenManager.isTokenExpired() && TokenManager.hasRefreshToken()) {
+    try {
+      const refreshToken = TokenManager.getRefreshToken()
+      if (refreshToken) {
+        const refreshResponse = await AuthApiService.refreshToken(refreshToken)
+        const { tokens, userContext } = authUtils.convertRefreshResponse(refreshResponse)
+        TokenManager.setTokens(tokens)
+        if (userContext) {
+          TokenManager.setUserContext(userContext)
+        }
+        token = tokens.accessToken
+      }
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.warn('[ftTmsFetch] Token refresh failed; continuing with existing token')
+      }
+    }
+  }
+
+  let response = await fetch(url, {
     ...options,
     credentials: 'include',
-    headers
+    headers: applyAuthHeaders(token)
   })
+
+  if (response.status === 401 && !didRetry && !usingDeskToken && TokenManager.hasRefreshToken()) {
+    try {
+      const refreshToken = TokenManager.getRefreshToken()
+      if (refreshToken) {
+        const refreshResponse = await AuthApiService.refreshToken(refreshToken)
+        const { tokens, userContext } = authUtils.convertRefreshResponse(refreshResponse)
+        TokenManager.setTokens(tokens)
+        if (userContext) {
+          TokenManager.setUserContext(userContext)
+        }
+        response = await fetch(url, {
+          ...options,
+          credentials: 'include',
+          headers: applyAuthHeaders(tokens.accessToken),
+          ...( { __retried: true } as unknown as RequestInit )
+        })
+      }
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.warn('[ftTmsFetch] Token refresh after 401 failed')
+      }
+    }
+  }
 
   if (!response.ok) {
     let errorMessage = `FT TMS request failed (${response.status})`
@@ -122,12 +189,17 @@ export const ftTmsFetch = async (pathOrUrl: string, options: RequestInit = {}): 
     }
 
     console.error('FT TMS API error:', { url, status: response.status, message: errorMessage })
-    
+
     // Throw AuthenticationError for 401 responses
     if (response.status === 401) {
       throw new AuthenticationError(errorMessage, response.status)
     }
-    
+
+    // Throw PermissionError for 403 responses
+    if (response.status === 403) {
+      throw new PermissionError(errorMessage, response.status)
+    }
+
     // Throw generic Error for other status codes
     throw new Error(errorMessage)
   }

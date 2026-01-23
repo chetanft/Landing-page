@@ -1,6 +1,5 @@
 import { buildFtTmsUrl, ftTmsFetch } from './ftTmsClient'
 import { getCompanyInfo } from './companyApiService'
-import { JOURNEY_COUNT_ONLY_MODE } from '../config/apiMode'
 
 // Transporter API types
 export interface TransporterData {
@@ -61,34 +60,20 @@ export interface TransporterOption {
   fteid: string
 }
 
-const FALLBACK_TRANSPORTERS: TransporterOption[] = [
-  { value: '', label: 'All Transporters', fteid: '' },
-  { value: 'COM-41e26eae-0cc2-4cd6-bfb2-88b302b9a697', label: 'Vinod Transporter', fteid: 'COM-41e26eae-0cc2-4cd6-bfb2-88b302b9a697' },
-  { value: 'COM-fad8704e-4a81-4c14-a76f-5512fe106e67', label: 'Deliverhawk Logistics-FTL', fteid: 'COM-fad8704e-4a81-4c14-a76f-5512fe106e67' },
-  { value: 'BRH-3061df96-b47f-471e-8fa7-ca5a0ca0f397', label: 'SHRI RAMKEVAL TRANS CARGO-FTL', fteid: 'BRH-3061df96-b47f-471e-8fa7-ca5a0ca0f397' },
-  { value: 'BRH-beb1573b-8d68-4d59-a215-18408368d9a5', label: 'RCM - FTL', fteid: 'BRH-beb1573b-8d68-4d59-a215-18408368d9a5' },
-  { value: 'COM-6a262337-12e1-4cd4-9d56-4b0cca8f9c30', label: 'TCI - FTL', fteid: 'COM-6a262337-12e1-4cd4-9d56-4b0cca8f9c30' }
-]
-
 /**
  * Fetch transporters from the API
  * @param ptlOnly - Whether to fetch only PTL transporters (for shipments)
  */
 export const fetchTransporters = async (ptlOnly = false): Promise<TransporterOption[]> => {
-  if (JOURNEY_COUNT_ONLY_MODE) {
-    return FALLBACK_TRANSPORTERS
-  }
-
   try {
     // Get current user's company info
     const companyInfo = await getCompanyInfo()
 
     if (!companyInfo) {
-      console.warn('No company info available, using mock data')
-      return FALLBACK_TRANSPORTERS
+      throw new Error('No company info available for transporter fetch')
     }
 
-    const baseUrl = buildFtTmsUrl('/eqs/v1/company/partners')
+    const baseUrl = buildFtTmsUrl('/api/eqs/v1/company/partners')
     // Build filter object based on whether PTL transporters are needed
     const filterObj = ptlOnly
       ? { partner_type: 'TRN', tags: 'PTL' }
@@ -126,8 +111,6 @@ export const fetchTransporters = async (ptlOnly = false): Promise<TransporterOpt
 
   } catch (error) {
     console.error('Failed to fetch transporters:', error)
-
-    // Return fallback options with mock data based on the provided response
-    return FALLBACK_TRANSPORTERS
+    throw error
   }
 }

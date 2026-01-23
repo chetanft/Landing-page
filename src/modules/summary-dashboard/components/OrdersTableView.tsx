@@ -121,7 +121,7 @@ export default function OrdersTableView({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-x4)', width: '100%' }}>
       {/* Header Section */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 'var(--spacing-x2)' }}>
-        <Typography variant="body-primary-semibold" style={{ fontSize: 'var(--font-size-md)', color: 'var(--color-primary)' }}>
+        <Typography variant="body-primary-semibold" style={{ fontSize: 'var(--font-size-md)', color: 'var(--primary)' }}>
           {orders.length} Orders available
         </Typography>
       </div>
@@ -286,13 +286,13 @@ export default function OrdersTableView({
                       ) : (
                         <Typography
                           variant="body-primary-regular"
-                          style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-primary)' }}
+                          style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)' }}
                         >
                           On time
                         </Typography>
                       )}
                       {row.deliveryEta && (
-                        <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-secondary)' }}>
+                        <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
                           {formatDateTime(row.deliveryEta)}
                         </Typography>
                       )}

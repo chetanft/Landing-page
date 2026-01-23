@@ -150,7 +150,7 @@ export const ModuleNavigation: React.FC<ModuleNavigationProps> = ({
                     size="sm"
                     style={{
                       padding: 0,
-                      color: 'var(--color-primary)'
+                      color: 'var(--primary)'
                     }}
                   >
                     Open →

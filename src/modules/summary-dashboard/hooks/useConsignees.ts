@@ -1,29 +1,29 @@
 import { useState, useEffect } from 'react'
-import { fetchConsignors, type ConsignorOption } from '../data/consignorApiService'
+import { fetchConsignees, type ConsigneeOption } from '../data/consigneeApiService'
 import { useAuth } from '../auth/AuthContext'
 
-interface UseConsignorsReturn {
-  consignors: ConsignorOption[]
+interface UseConsigneesReturn {
+  consignees: ConsigneeOption[]
   isLoading: boolean
   error: string | null
   refetch: () => Promise<void>
 }
 
-export function useConsignors(): UseConsignorsReturn {
+export function useConsignees(): UseConsigneesReturn {
   const { user, isAuthenticated } = useAuth()
-  const [consignors, setConsignors] = useState<ConsignorOption[]>([])
+  const [consignees, setConsignees] = useState<ConsigneeOption[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const loadConsignors = async () => {
+  const loadConsignees = async () => {
     try {
       setIsLoading(true)
       setError(null)
-      const data = await fetchConsignors()
-      setConsignors(data)
+      const data = await fetchConsignees()
+      setConsignees(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch consignors')
-      console.error('Error in useConsignors:', err)
+      setError(err instanceof Error ? err.message : 'Failed to fetch consignees')
+      console.error('Error in useConsignees:', err)
     } finally {
       setIsLoading(false)
     }
@@ -31,18 +31,18 @@ export function useConsignors(): UseConsignorsReturn {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      setConsignors([])
+      setConsignees([])
       setIsLoading(false)
       setError(null)
       return
     }
-    loadConsignors()
+    loadConsignees()
   }, [isAuthenticated, user?.orgId])
 
   return {
-    consignors,
+    consignees,
     isLoading,
     error,
-    refetch: loadConsignors
+    refetch: loadConsignees
   }
 }

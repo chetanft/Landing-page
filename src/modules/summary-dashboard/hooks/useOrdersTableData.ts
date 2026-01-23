@@ -30,7 +30,7 @@ export function useOrdersTableData({
   selectedOutboundOption,
   globalFilters,
   page = 1,
-  pageSize = 50,
+  pageSize = 1000,
 }: UseOrdersTableDataParams): UseOrdersTableDataResult {
   const [orders, setOrders] = useState<OrderRow[]>([])
   const [summary, setSummary] = useState<OrderSummary | null>(null)

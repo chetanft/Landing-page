@@ -52,7 +52,7 @@ export default function LoginPage() {
       description: 'Effortlessly track your PTL and cargo shipments across multiple courier partners. Get real-time updates, manage dispatches, and streamline your logistics with ease.',
       image: imgImage5,
       cardGradient: 'linear-gradient(135deg, var(--bg-primary) 0%, #F3F8FF 100%)',
-      textGradient: 'linear-gradient(90deg, var(--color-primary) 0%, #3B82F6 100%)'
+      textGradient: 'linear-gradient(90deg, var(--primary) 0%, #3B82F6 100%)'
     },
     {
       title: 'FT FTL : Full Truck Load TMS',
@@ -199,7 +199,7 @@ export default function LoginPage() {
           {/* Login Section */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <Typography variant="display-primary" style={{ 
-              color: 'var(--color-primary)',
+              color: 'var(--primary)',
               fontSize: '20px',
               fontWeight: 600,
               lineHeight: 1.4
@@ -236,7 +236,7 @@ export default function LoginPage() {
                 {/* Email Input */}
                 <Input size="lg" variant="default">
                   <InputLabel style={{ 
-                    color: 'var(--color-secondary)',
+                    color: 'var(--text-secondary)',
                     fontSize: '14px',
                     fontWeight: 500
                   }}>
@@ -257,7 +257,7 @@ export default function LoginPage() {
                 {/* Password Input */}
                 <Input size="lg" variant="default">
                   <InputLabel style={{ 
-                    color: 'var(--color-secondary)',
+                    color: 'var(--text-secondary)',
                     fontSize: '14px',
                     fontWeight: 500
                   }}>
@@ -307,7 +307,7 @@ export default function LoginPage() {
                   />
                   <SwitchLabel style={{ 
                     fontSize: '12px',
-                    color: 'var(--color-primary)',
+                    color: 'var(--primary)',
                     letterSpacing: '0.3px'
                   }}>
                     Remember me
@@ -356,7 +356,7 @@ export default function LoginPage() {
                 width: '100%',
                 height: '40px',
                 borderRadius: '8px',
-                backgroundColor: 'var(--color-primary)',
+                backgroundColor: 'var(--primary)',
                 fontSize: '16px',
                 fontWeight: 500
               }}
@@ -375,7 +375,7 @@ export default function LoginPage() {
                 style={{ 
                   width: '100%',
                   height: '40px',
-                  color: 'var(--color-primary)',
+                  color: 'var(--primary)',
                   fontSize: '16px',
                   fontWeight: 500
                 }}
@@ -408,7 +408,7 @@ export default function LoginPage() {
               >
                 <img src={imgGoogleIcon} alt="Google" style={{ width: '20px', height: '20px' }} />
                 <span style={{ 
-                  color: 'var(--color-primary)',
+                  color: 'var(--primary)',
                   fontSize: '16px',
                   fontWeight: 500
                 }}>
@@ -437,7 +437,7 @@ export default function LoginPage() {
               >
                 <img src={imgMicrosoftLogo} alt="Microsoft" style={{ width: '20px', height: '20px' }} />
                 <span style={{ 
-                  color: 'var(--color-primary)',
+                  color: 'var(--primary)',
                   fontSize: '16px',
                   fontWeight: 500
                 }}>
@@ -477,7 +477,7 @@ export default function LoginPage() {
             height: '24px'
           }}>
             <Typography variant="body-secondary-regular" style={{ 
-              color: '#666',
+              color: 'var(--text-tertiary)',
               fontSize: '13px',
               fontWeight: 400
             }}>
@@ -510,10 +510,10 @@ export default function LoginPage() {
               width: '7px',
               height: '7px',
               borderRadius: '50%',
-              backgroundColor: 'var(--color-secondary)'
+              backgroundColor: 'var(--text-secondary)'
             }} />
             <Typography variant="body-secondary-semibold" style={{ 
-              color: 'var(--color-secondary)',
+              color: 'var(--text-secondary)',
               fontSize: '14px'
             }}>
               What's New?
@@ -579,7 +579,7 @@ export default function LoginPage() {
                 {/* Section Header */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <Typography variant="title-primary" style={{
-                    color: 'var(--color-primary)',
+                    color: 'var(--primary)',
                     background: slide.textGradient,
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
@@ -589,7 +589,7 @@ export default function LoginPage() {
                     {slide.title}
                   </Typography>
                   <Typography variant="body-primary-regular" style={{
-                    color: 'var(--color-secondary)',
+                    color: 'var(--text-secondary)',
                     fontSize: '16px',
                     lineHeight: 1.4,
                     display: 'flex',
@@ -640,7 +640,7 @@ export default function LoginPage() {
                 height: '8px',
                 borderRadius: '100px',
                 backgroundColor: currentSlide === index 
-                  ? 'var(--color-primary)' 
+                  ? 'var(--primary)' 
                   : 'var(--border-primary)',
                 border: 'none',
                 cursor: 'pointer',

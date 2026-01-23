@@ -48,6 +48,8 @@ export default function SummaryDashboardPage() {
     locationName: 'All Locations',
     transporterId: undefined,
     transporterName: 'All Transporters',
+    consigneeId: undefined,
+    consigneeName: 'All Consignees',
     dateRange: getDefaultDateRange(),
     priority: defaultTab === 'shipments' ? priorityFilter : undefined
   })
@@ -220,6 +222,7 @@ export default function SummaryDashboardPage() {
         onOpenChange={setIsFilterPaneOpen}
         globalFilters={globalFilters}
         onFiltersChange={handleFiltersChange}
+        transporterPtlOnly={activeTab === 'shipments'}
       />
 
       <OrderDetailsDrawer

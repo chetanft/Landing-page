@@ -21,12 +21,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "copy:ft-assets": "node scripts/copy-ft-design-assets.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.18",
     "crypto-js": "^4.2.0",
-    "ft-design-system": "^4.15.20",
+    "ft-design-system": "^4.15.23",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-router-dom": "^7.12.0"

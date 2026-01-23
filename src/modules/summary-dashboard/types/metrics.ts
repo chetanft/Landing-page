@@ -52,6 +52,8 @@ export interface GlobalFilters {
   locationName?: string
   transporterId?: string
   transporterName?: string
+  consigneeId?: string
+  consigneeName?: string
   dateRange: {
     start: Date
     end: Date

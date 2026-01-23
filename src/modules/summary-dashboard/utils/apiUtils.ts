@@ -21,6 +21,8 @@ export class ApiError extends Error {
  * Get standard headers for FreightTiger API calls
  */
 export const getStandardHeaders = (): Record<string, string> => {
+  const isBranchFteid = (value?: string | null) =>
+    Boolean(value && (value.startsWith('BRH-') || value.startsWith('BRN-')))
   const headers: Record<string, string> = {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
@@ -36,7 +38,9 @@ export const getStandardHeaders = (): Record<string, string> => {
   const userContext = TokenManager.getUserContext()
   if (userContext) {
     headers['X-Org-Id'] = userContext.orgId
-    headers['X-Branch-Id'] = userContext.branchId
+    if (isBranchFteid(userContext.branchId)) {
+      headers['X-Branch-Id'] = userContext.branchId
+    }
     headers['X-User-Role'] = userContext.userRole
     headers['X-User-Id'] = userContext.userId
   }

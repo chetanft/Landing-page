@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   fetchOrderDetails,
-  fetchOrderTimeline,
   fetchOrderComments,
-  fetchCommentTemplates,
   addOrderComment,
 } from '../data/ordersApiService'
 import type {
@@ -75,7 +73,6 @@ export function useOrderDrawerData({
 
   // Cache to avoid refetching when switching tabs
   const detailsCache = useMemo(() => new Map<string, OrderDetailsResponse['data']>(), [])
-  const timelineCache = useMemo(() => new Map<string, OrderTimelineResponse['data']>(), [])
   const commentsCache = useMemo(() => new Map<string, OrderComment[]>(), [])
 
   // Load details
@@ -109,32 +106,10 @@ export function useOrderDrawerData({
 
   // Load timeline
   const loadTimeline = useCallback(async () => {
-    if (!orderId) {
-      setTimeline(null)
-      return
-    }
-
-    // Check cache first
-    if (timelineCache.has(orderId)) {
-      setTimeline(timelineCache.get(orderId)!)
-      return
-    }
-
-    setTimelineLoading(true)
-    setTimelineError(null)
-
-    try {
-      const data = await fetchOrderTimeline(orderId)
-      timelineCache.set(orderId, data)
-      setTimeline(data)
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to fetch order timeline')
-      setTimelineError(error)
-      console.error('Error loading order timeline:', error)
-    } finally {
-      setTimelineLoading(false)
-    }
-  }, [orderId, timelineCache])
+    setTimeline(null)
+    setTimelineLoading(false)
+    setTimelineError(new Error('Order timeline API has been removed'))
+  }, [])
 
   // Load comments
   const loadComments = useCallback(async () => {
@@ -165,22 +140,10 @@ export function useOrderDrawerData({
     }
   }, [orderId, commentsCache])
 
-  // Load templates (only once)
   useEffect(() => {
-    if (templates.length > 0) return
-
-    setTemplatesLoading(true)
-    fetchCommentTemplates()
-      .then((data) => {
-        setTemplates(data)
-      })
-      .catch((err) => {
-        console.error('Error loading comment templates:', err)
-      })
-      .finally(() => {
-        setTemplatesLoading(false)
-      })
-  }, [templates.length])
+    setTemplates([])
+    setTemplatesLoading(false)
+  }, [])
 
   // Load data based on active tab and orderId
   useEffect(() => {

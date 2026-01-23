@@ -95,16 +95,10 @@ Primary APIs (existing in code):
 - Orders list: /ptl-booking/api/v1/order/myOrders
 - Orders bucket summary: /ptl-booking/api/v1/order/myOrdersBucketSummary
 - Order details: /ptl-booking/api/v1/order/{id}/details
-- Order timeline: /ptl-booking/api/v1/order/{id}/timeline
 - Order comments: /ptl-booking/api/v1/order/{id}/comments
-- Comment templates: /ptl-booking/api/v1/order/comments/templates
 - Custom data template: /planning-engine-service/v1/api/custom-data-template/order
 
 Enrichment logic:
-- If stage/milestone/dispatchDate missing, call timeline API and derive:
-  - stage: last timeline event label or type
-  - milestone: last event subLabel or label
-  - dispatchDate: first event whose label includes "dispatch"
 - tripType derived from explicit tripType/orderType, else infer from journeyId (FTL) or shipmentId (PTL).
 
 ### 5.2 Non-Dispatch Planning flow (derived)
@@ -131,12 +125,12 @@ Derivation approach:
 - consigneeName: dispatch -> order list; non-dispatch -> journey/shipment/consignee fields
 - route: dispatch -> order list origin/destination; non-dispatch -> journey route or shipment legs
 - tripType: dispatch -> order tripType/orderType; non-dispatch -> if journeyId then FTL, if shipmentId then PTL, else Unplanned
-- stage: dispatch -> order list or timeline enrichment; non-dispatch -> derived from latest linked entity stage (see Stage Rules)
-- milestone: dispatch -> order list or timeline enrichment; non-dispatch -> journey/shipment milestone or derived from latest event
+- stage: dispatch -> order list; non-dispatch -> derived from latest linked entity stage (see Stage Rules)
+- milestone: dispatch -> order list; non-dispatch -> journey/shipment milestone or derived from latest event
 - status: dispatch -> order status; non-dispatch -> mapped from entity status (journey_status/shipment_status/invoice_status)
 - relatedIdType/relatedId: dispatch -> indentId/journeyId/epodId/invoiceNumber; non-dispatch -> primary linked entity
 - deliveryStatus/delayDays/deliveryEta: dispatch -> order list; non-dispatch -> journey ETA/delay or shipment ETA/delay
-- dispatchDate: dispatch -> timeline enrichment; non-dispatch -> journey dispatch time or shipment pickup
+- dispatchDate: dispatch -> order list; non-dispatch -> journey dispatch time or shipment pickup
 - customData: dispatch -> custom-data-template fields from order list; non-dispatch -> not available unless provided by source
 
 ### 6.2 Order Details Drawer
@@ -146,12 +140,11 @@ Derivation approach:
 - doCount/skuCount: dispatch -> order details; non-dispatch -> derived by aggregating DO/SKU from shipments/invoices
 - createdAt: dispatch -> order details; non-dispatch -> earliest created_at across linked entities
 - status: dispatch -> order details; non-dispatch -> derived using Stage Rules
-- deliveryStatus/delayMinutes: dispatch -> order details or timeline; non-dispatch -> journey/shipment delay metrics
+- deliveryStatus/delayMinutes: dispatch -> order details; non-dispatch -> journey/shipment delay metrics
 - eta/sta: dispatch -> order details; non-dispatch -> journey ETA/STA or shipment ETA/STA
-- nextMilestoneLabel/ETA: dispatch -> order details/timeline; non-dispatch -> next journey/shipment milestone
+- nextMilestoneLabel/ETA: dispatch -> order details; non-dispatch -> next journey/shipment milestone
 - parties (sender/shipTo/billTo): dispatch -> order details; non-dispatch -> journey/indent/invoice party fields
 - identifiers: dispatch -> order details; non-dispatch -> linked entity ids
-- timeline: dispatch -> order timeline; non-dispatch -> synthesized from journey/indent/shipment/invoice events
 - comments: dispatch -> order comments; non-dispatch -> optional (if supported)
 
 ## 7. Stage, Milestone, Status Rules

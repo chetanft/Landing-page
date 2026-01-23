@@ -1,11 +1,8 @@
 import type { TabId, TabData, MetricData, LifecycleStage, GlobalFilters } from '../types/metrics'
-import { getMetricsByTab } from './metricsRegistry'
-import { mockMetricCounts, lifecycleStagesConfig, simulateApiDelay } from './mockData'
 import { fetchJourneyMetrics } from './journeyApiService'
 import { fetchShipmentMetrics } from './shipmentsApiService'
 import { realApiService } from './realApiService'
 import { fetchOrdersBucketSummary } from './ordersApiService'
-import { TokenManager } from '../auth/tokenManager'
 import { JOURNEY_COUNT_ONLY_MODE } from '../config/apiMode'
 
 const ordersLifecycleStageConfig = [
@@ -116,15 +113,20 @@ const buildRealOrdersLifecycleStages = async (
   globalFilters: GlobalFilters
 ): Promise<LifecycleStage[]> => {
   try {
-    // Fetch both order status counts and bucket summary in parallel
-    const [statusResponse, bucketSummary] = await Promise.all([
-      realApiService.getOrderStatusCounts(branchFteid),
-      fetchOrdersBucketSummary(globalFilters)
-    ])
-    
-    const counts = statusResponse.data.counts
+    const bucketSummaryPromise = fetchOrdersBucketSummary(globalFilters)
+
+    let counts: Record<string, number | undefined> = {}
+    if (branchFteid === '__ALL__') {
+      const statusResponse = await realApiService.getOrderStatusCounts()
+      counts = statusResponse.data.counts
+    } else {
+      const statusResponse = await realApiService.getOrderStatusCounts(branchFteid)
+      counts = statusResponse.data.counts
+    }
+
+    const bucketSummary = await bucketSummaryPromise
     const getCount = (value?: number) => (typeof value === 'number' ? value : 0)
-    
+
     if (import.meta.env.DEV && bucketSummary) {
       console.log('[buildRealOrdersLifecycleStages] Bucket summary:', bucketSummary)
     }
@@ -386,8 +388,6 @@ export const fetchTabMetrics = async (
   if (import.meta.env.DEV) {
     console.log('[fetchTabMetrics] Called for tab:', tab, 'JOURNEY_COUNT_ONLY_MODE:', JOURNEY_COUNT_ONLY_MODE)
   }
-  const isBranchFteid = (value?: string | null) =>
-    Boolean(value && (value.startsWith('BRH-') || value.startsWith('BRN-')))
   // Use real API for journeys tab
   if (tab === 'journeys') {
     return fetchJourneyMetrics(globalFilters)
@@ -396,122 +396,48 @@ export const fetchTabMetrics = async (
   // For orders tab, try to use real API if we have a selected branch
   if (tab === 'orders') {
     try {
-      let selectedBranch = isBranchFteid(globalFilters.locationId) ? globalFilters.locationId : undefined
-
-      if (!selectedBranch) {
-        const envBranch = import.meta.env.VITE_FT_TMS_BRANCH_FTEID
-        selectedBranch = isBranchFteid(envBranch) ? envBranch : undefined
-      }
-
-      if (!selectedBranch) {
-        const userContext = TokenManager.getUserContext()
-        selectedBranch = isBranchFteid(userContext?.branchId) ? userContext?.branchId : undefined
-      }
-
-      // If still no branch, try user settings for lastSelectedBranch
-      if (!selectedBranch) {
-        try {
-          const userSettings = await realApiService.getUserSettings()
-          const lastBranch = userSettings?.data?.lastSelectedBranch
-          if (lastBranch && isBranchFteid(lastBranch)) {
-            selectedBranch = lastBranch
-            if (import.meta.env.DEV) {
-              console.log('[fetchTabMetrics] Using lastSelectedBranch from user settings:', selectedBranch)
-            }
-          }
-        } catch (settingsError) {
-          if (import.meta.env.DEV) {
-            console.warn('[fetchTabMetrics] Failed to fetch user settings:', settingsError)
-          }
-        }
-      }
-
-      // If still no branch, try fetching company hierarchy to get first branch
-      if (!selectedBranch) {
-        try {
-          const hierarchy = await realApiService.getCompanyHierarchy()
-          // Find first branch with BRH- prefix (skip COM- entries)
-          const firstBranch = hierarchy?.data?.total_branches?.find(branch => 
-            branch.fteid && isBranchFteid(branch.fteid)
-          )
-          if (firstBranch?.fteid) {
-            selectedBranch = firstBranch.fteid
-            if (import.meta.env.DEV) {
-              console.log('[fetchTabMetrics] Using first branch from hierarchy:', selectedBranch, firstBranch.name)
-            }
-          }
-        } catch (hierarchyError) {
-          if (import.meta.env.DEV) {
-            console.warn('[fetchTabMetrics] Failed to fetch company hierarchy:', hierarchyError)
-          }
-        }
-      }
+      const selectedBranch = globalFilters.locationId || undefined
 
       if (import.meta.env.DEV) {
         console.log('[fetchTabMetrics] Orders tab - selectedBranch:', selectedBranch, {
           locationId: globalFilters.locationId,
-          envBranch: import.meta.env.VITE_FT_TMS_BRANCH_FTEID,
-          userBranchId: TokenManager.getUserContext()?.branchId
+          envBranch: import.meta.env.VITE_FT_TMS_BRANCH_FTEID
         })
       }
 
-      if (selectedBranch) {
-        if (import.meta.env.DEV) {
-          console.log('[fetchTabMetrics] Calling planning API with branch_fteid:', selectedBranch)
-        }
-        const lifecycleStages = await buildRealOrdersLifecycleStages(selectedBranch, globalFilters)
-
-        // Build quick KPIs from real data
-        const quickKPIs: MetricData[] = []
-
-        // Calculate total orders from all stages
-        let totalOrders = 0
-        lifecycleStages.forEach(stage => {
-          stage.metrics.forEach(metric => {
-            totalOrders += metric.count
-          })
-        })
-
-        quickKPIs.push({
-          metricId: 'orders.total',
-          label: 'Total Orders',
-          count: totalOrders,
-          statusType: 'neutral',
-          target: { path: '/tms/orders', defaultFilters: {} },
-        })
-
-        return {
-          id: tab,
-          label: 'Orders',
-          quickKPIs,
-          lifecycleStages,
-        }
+      if (import.meta.env.DEV) {
+        console.log('[fetchTabMetrics] Calling planning API with branch_fteid:', selectedBranch || 'ALL')
       }
-      
-      // No branch selected - return empty structure
+      const lifecycleStages = await buildRealOrdersLifecycleStages(
+        selectedBranch || '__ALL__',
+        globalFilters
+      )
+
+      const quickKPIs: MetricData[] = []
+      let totalOrders = 0
+      lifecycleStages.forEach(stage => {
+        stage.metrics.forEach(metric => {
+          totalOrders += metric.count
+        })
+      })
+
+      quickKPIs.push({
+        metricId: 'orders.total',
+        label: 'Total Orders',
+        count: totalOrders,
+        statusType: 'neutral',
+        target: { path: '/tms/orders', defaultFilters: {} },
+      })
+
       return {
         id: tab,
         label: 'Orders',
-        quickKPIs: [],
-        lifecycleStages: ordersLifecycleStageConfig.map((config) => ({
-          id: config.id,
-          title: config.title,
-          metrics: [],
-        })),
+        quickKPIs,
+        lifecycleStages,
       }
     } catch (error) {
       console.error('Failed to fetch real orders data:', error)
-      // Return empty structure on error - let dashboard handle error display
-      return {
-        id: tab,
-        label: 'Orders',
-        quickKPIs: [],
-        lifecycleStages: ordersLifecycleStageConfig.map((config) => ({
-          id: config.id,
-          title: config.title,
-          metrics: [],
-        })),
-      }
+      throw error
     }
   }
 
@@ -523,82 +449,14 @@ export const fetchTabMetrics = async (
     return fetchShipmentMetrics(globalFilters)
   }
 
-  // Fallback to mock data for other tabs or when real API fails
-  await simulateApiDelay()
-  const metrics = getMetricsByTab(tab)
-
-  // Build quick KPIs
-  const quickKPIs: MetricData[] = metrics
-    .filter((m) => m.group === 'quickKPI')
-    .sort((a, b) => (a.order || 0) - (b.order || 0))
-    .map((m) => ({
-      metricId: m.metricId,
-      label: m.title,
-      count: mockMetricCounts[m.metricId] || 0,
-      statusType: m.statusType || 'neutral',
-      target: m.target,
-    }))
-
-  const lifecycleStages: LifecycleStage[] = (lifecycleStagesConfig[tab] || []).map((stageConfig) => {
-      // Get main metrics for this stage
-      const stageMetrics: MetricData[] = metrics
-        .filter((m) => m.group === stageConfig.groupPrefix)
-        .sort((a, b) => (a.order || 0) - (b.order || 0))
-        .map((m) => ({
-          metricId: m.metricId,
-          label: m.title,
-          count: mockMetricCounts[m.metricId] || 0,
-          statusType: m.statusType || 'neutral',
-          target: m.target,
-        }))
-
-      // Get exceptions for this stage
-      const exceptions: MetricData[] = metrics
-        .filter((m) => m.group === `${stageConfig.groupPrefix}.exceptions`)
-        .sort((a, b) => (a.order || 0) - (b.order || 0))
-        .map((m) => ({
-          metricId: m.metricId,
-          label: m.title,
-          count: mockMetricCounts[m.metricId] || 0,
-          statusType: m.statusType || 'warning',
-          target: m.target,
-        }))
-
-      // Get status metrics for this stage (on time, delay)
-      const status: MetricData[] = metrics
-        .filter((m) => m.group === `${stageConfig.groupPrefix}.status`)
-        .sort((a, b) => (a.order || 0) - (b.order || 0))
-        .map((m) => ({
-          metricId: m.metricId,
-          label: m.title,
-          count: mockMetricCounts[m.metricId] || 0,
-          statusType: m.statusType || 'neutral',
-          target: m.target,
-        }))
-
-      return {
-        id: stageConfig.id,
-        title: stageConfig.title,
-        metrics: stageMetrics.length > 0 ? stageMetrics : [], // Ensure metrics is always an array
-        exceptions: exceptions.length > 0 ? exceptions : undefined,
-        status: status.length > 0 ? status : undefined,
-      }
-    })
-
-  return {
-    id: tab,
-    label: tab.charAt(0).toUpperCase() + tab.slice(1),
-    quickKPIs,
-    lifecycleStages,
-  }
+  throw new Error(`No real API implementation for tab: ${tab}`)
 }
 
 /**
  * Refresh a specific metric (for webhook-triggered updates)
  */
 export const refreshMetric = async (metricId: string): Promise<number> => {
-  await simulateApiDelay(100, 300)
-  return mockMetricCounts[metricId] || 0
+  throw new Error(`No real API implementation for metric refresh: ${metricId}`)
 }
 
 /**

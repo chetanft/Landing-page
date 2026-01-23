@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
-import { TokenManager, UserContext, AuthTokens } from './tokenManager'
+import { TokenManager, UserContext } from './tokenManager'
 import { AuthApiService, authUtils } from './authApiService'
+import { realApiService } from '../data/realApiService'
+import { clearCompanyCache } from '../data/companyApiService'
 
 export interface LoginCredentials {
   username: string
@@ -155,6 +157,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       // Clear any stale tokens before starting a fresh login
       TokenManager.clearAuth()
+      clearCompanyCache()
       // Use dedicated auth API service
       // Pass email as username (API accepts username field)
       const response = await AuthApiService.login({
@@ -175,22 +178,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // FT app flow: fetch desks and get desk token (used for indent API)
       try {
+        if (import.meta.env.DEV) {
+          console.log('[AuthContext] Starting desk fetch...')
+        }
         const desks = await AuthApiService.getDesks()
         if (import.meta.env.DEV) {
-          console.log('[AuthContext] Desks fetched:', desks.length)
+          console.log('[AuthContext] Desks fetched:', {
+            count: desks.length,
+            desks: desks.map(d => ({ fteid: d.fteid, name: d.name }))
+          })
         }
         const firstDesk = desks?.[0]
         if (firstDesk?.fteid) {
           if (import.meta.env.DEV) {
             console.log('[AuthContext] Using desk fteid:', firstDesk.fteid)
+            console.log('[AuthContext] Desk payload for branch resolution:', firstDesk)
           }
-          // Update user context with branch_fteid from desk (for planning API)
-          if (firstDesk.parent_fteid && userContext) {
-            const updatedContext = { ...userContext, branchId: firstDesk.parent_fteid }
+          // Update user context with branch FTEID from desk (for planning API)
+          const deskBranchCandidate =
+            (firstDesk as any).branch_fteid ||
+            (firstDesk as any).branchFteid ||
+            (firstDesk as any).branch_id ||
+            (firstDesk as any).branchId ||
+            firstDesk.parent_fteid ||
+            (firstDesk as any).parentFteid
+          const isBranchFteid = (value?: string | null) =>
+            Boolean(value && (value.startsWith('BRH-') || value.startsWith('BRN-')))
+          if (userContext && isBranchFteid(deskBranchCandidate)) {
+            const updatedContext = { ...userContext, branchId: String(deskBranchCandidate) }
             TokenManager.setUserContext(updatedContext)
             setUser(updatedContext)
             if (import.meta.env.DEV) {
-              console.log('[AuthContext] Updated branchId from desk:', firstDesk.parent_fteid)
+              console.log('[AuthContext] Updated branchId from desk:', updatedContext.branchId)
+            }
+          } else {
+            if (import.meta.env.DEV) {
+              console.warn('[AuthContext] No branch FTEID found on desk payload')
             }
           }
 
@@ -208,10 +231,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           } else if (import.meta.env.DEV) {
             console.warn('[AuthContext] Desk token missing in response')
           }
+
+          // Fetch role permissions (access-control uses desk token)
+          try {
+            const roleFteid = userContext?.userRole || ''
+            if (roleFteid.startsWith('ROL-')) {
+              const roleResponse = await realApiService.getRoleDetails(roleFteid)
+              const permissions = roleResponse?.data?.permissions || []
+              const updatedContext = { ...(TokenManager.getUserContext() || userContext), permissions }
+              TokenManager.setUserContext(updatedContext)
+              setUser(updatedContext)
+              if (import.meta.env.DEV) {
+                console.log('[AuthContext] Stored role permissions:', permissions.length)
+              }
+            }
+          } catch (permissionError) {
+            if (import.meta.env.DEV) {
+              console.warn('[AuthContext] Failed to fetch role permissions:', permissionError)
+            }
+          }
         } else if (import.meta.env.DEV) {
           console.warn('[AuthContext] No desks found for user')
         }
       } catch (deskError) {
+        if (import.meta.env.DEV) {
+          console.error('[AuthContext] Failed to fetch desk token:', {
+            error: deskError,
+            message: deskError instanceof Error ? deskError.message : 'Unknown desk error',
+            userContext: userContext,
+            hasLoginToken: !!TokenManager.getAccessToken()
+          })
+        }
         console.warn('Failed to fetch desk token:', deskError)
       }
 
@@ -273,6 +323,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Clear local storage and state
     TokenManager.clearAuth()
+    clearCompanyCache()
     setToken(null)
     setUser(null)
     setError(null)

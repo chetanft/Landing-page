@@ -82,10 +82,10 @@ body {
 
 /* Search icon path color override */
 /* Targets the path element inside Search icon component */
-/* Change 4: color var(--color-primary) */
+/* Change 4: color var(--primary) */
 .search-input-wrapper svg path {
-  color: var(--color-primary) !important;
-  fill: var(--color-primary) !important;
+  color: var(--primary) !important;
+  fill: var(--primary) !important;
 }
 
 /* Select component styling */
@@ -98,7 +98,7 @@ button[role="combobox"] {
 /* Targets spans with text-md-rem class inside dropdown/select components */
 button[role="combobox"] span.text-md-rem,
 span.text-md-rem {
-  color: var(--color-primary) !important;
+  color: var(--primary) !important;
 }
 
 /* SelectValue span.text-md-rem font-size override */
@@ -120,14 +120,39 @@ h1.font-sans.font-normal {
   font-weight: 600 !important;
 }
 
+/* Typography display-primary variant color override */
+/* Targets Typography components with display-primary variant and color="primary" */
+/* Changes color from rgb(67, 79, 100) to var(--primary) */
+div.font-sans.text-lg-rem.font-semibold {
+  color: var(--primary) !important;
+}
+
 /* Typography body-primary-regular date/time color override */
 /* Targets Typography components with body-primary-regular variant displaying dates/times */
-/* Changes color from var(--text-primary) to var(--color-secondary) */
+/* Changes color from var(--text-primary) to var(--text-secondary) */
 /* This rule targets elements with fontSize in style attribute, including those with both fontSize and color */
 /* Has equal specificity to FilterOption rule and comes last, so it takes precedence for date/time Typography */
 p.font-sans.font-normal[style*="fontSize"][style*="color"],
 p.font-sans.font-normal[style*="fontSize"] {
-  color: var(--color-secondary) !important;
+  color: var(--text-secondary) !important;
+}
+
+/* Typography body-primary-semibold color="secondary" override */
+/* Targets Typography components with body-primary-semibold variant and color="secondary" prop */
+/* Changes color from rgb(0, 0, 0) to var(--text-secondary) */
+/* This rule targets p elements with font-sans, text-md-rem, and font-semibold classes */
+/* Specifically targets elements with fontSize in style but no explicit color (color="secondary" prop) */
+p.font-sans.text-md-rem.font-semibold[style*="fontSize"]:not([style*="color"]) {
+  color: var(--text-secondary) !important;
+}
+
+/* Typography body-secondary-medium color="tertiary" override */
+/* Targets Typography components with body-secondary-medium variant and color="tertiary" prop */
+/* Changes color from rgb(0, 0, 0) to var(--text-tertiary) */
+/* This rule targets p elements with font-sans, text-sm-rem, and font-medium classes */
+/* Specifically targets elements with fontSize in style (color="tertiary" prop) */
+p.font-sans.text-sm-rem.font-medium[style*="fontSize"] {
+  color: var(--text-tertiary) !important;
 }
 
 /* FilterOption Typography color override - targets Typography with body-primary-regular variant */
@@ -159,6 +184,42 @@ p.font-sans.font-normal[style*="fontSize"] {
   width: fit-content !important;
   height: fit-content !important;
   justify-content: flex-start !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+/* AppHeader height override */
+/* Targets the header element inside AppHeader component */
+/* Changes height from 56px to 64px */
+header.bg-\[var\(--bg-secondary\)\] {
+  height: 64px !important;
+}
+
+/* AppHeader SVG styling */
+/* Targets the SVG element inside AppHeader component */
+/* Changes: width 100%, height 100%, display flex */
+header svg {
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+}
+
+/* AppHeader icon container padding override */
+/* Targets the div with rounded-full and w-10 h-10 classes inside AppHeader */
+/* Changes padding from 14px (p-4) to 8px */
+header div.rounded-full.w-10.h-10 {
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+/* AvatarFallback span padding override */
+/* Targets the span.flex.items-center.justify-center.font-medium element inside AvatarFallback component */
+/* Changes padding from 0px to 12px on all sides */
+header span.flex.items-center.justify-center.font-medium {
   padding-top: 12px !important;
   padding-bottom: 12px !important;
   padding-left: 12px !important;

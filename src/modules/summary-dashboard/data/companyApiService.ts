@@ -1,4 +1,5 @@
-import { buildFtTmsUrl, ftTmsFetch } from './ftTmsClient'
+import { realApiService } from './realApiService'
+import { TokenManager } from '../auth/tokenManager'
 
 export interface CompanyInfo {
   fteid: string
@@ -7,15 +8,39 @@ export interface CompanyInfo {
   status: string
 }
 
-export interface UserCompanyResponse {
-  success: boolean
-  data: {
-    user: {
-      fteid: string
-      name: string
-      email: string
-    }
-    company: CompanyInfo
+const decodeTokenPayload = (tokenValue: string) => {
+  try {
+    const payload = tokenValue.split('.')[1]
+    if (!payload) return null
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+    return JSON.parse(atob(normalized))
+  } catch {
+    return null
+  }
+}
+
+const getCompanyFromToken = (): CompanyInfo | null => {
+  const token = TokenManager.getAccessToken()
+  if (!token) return null
+
+  const decoded = decodeTokenPayload(token)
+  if (!decoded) return null
+
+  const ucv = decoded.ucv || {}
+  const fteid = ucv.entity_guid
+    || ucv.entity_fteid
+    || decoded.company_fteid
+    || decoded.companyFteid
+    || decoded.orgFteid
+    || decoded.desk_parent_fteid
+
+  if (!fteid) return null
+
+  return {
+    fteid: String(fteid),
+    name: String(ucv.company_name || decoded.company_name || ''),
+    company_code: String(ucv.company_code || decoded.company_code || ''),
+    status: String(ucv.company_status || decoded.company_status || 'active')
   }
 }
 
@@ -24,34 +49,96 @@ export interface UserCompanyResponse {
  * This would typically be called on app initialization or page load
  */
 export const getCurrentUserCompany = async (): Promise<CompanyInfo | null> => {
-  try {
-    // First try to get from user profile endpoint
-    const profileResponse = await ftTmsFetch(buildFtTmsUrl('/eqs/v1/user/profile'))
-    const profileData: UserCompanyResponse = await profileResponse.json()
-
-    if (profileData.success && profileData.data.company) {
-      return profileData.data.company
+  const fromToken = getCompanyFromToken()
+  if (fromToken) {
+    try {
+      const entityResponse = await realApiService.getCompanyDetailsEntityService(fromToken.fteid)
+      const entityCompany = entityResponse?.data?.[0]
+      if (entityCompany?.fteid) {
+        return {
+          fteid: String(entityCompany.fteid),
+          name: String(entityCompany.name || fromToken.name || ''),
+          company_code: String(entityCompany.company_code || fromToken.company_code || ''),
+          status: String(entityCompany.status || (entityCompany.is_active ? 'active' : 'inactive') || fromToken.status)
+        }
+      }
+    } catch {
+      // Ignore and fallback to token or EQS.
     }
 
-    // Fallback: try to get company info directly
-    const companyResponse = await ftTmsFetch(buildFtTmsUrl('/eqs/v1/company/current'))
-    const companyData = await companyResponse.json()
-
-    if (companyData.success && companyData.data) {
-      return companyData.data
+    try {
+      const eqsResponse = await realApiService.getCompanyDetailsEqs(fromToken.fteid)
+      const eqsCompany = eqsResponse?.data?.[0]
+      if (eqsCompany?.fteid) {
+        return {
+          fteid: String(eqsCompany.fteid),
+          name: String(eqsCompany.name || fromToken.name || ''),
+          company_code: String(eqsCompany.company_code || fromToken.company_code || ''),
+          status: String(eqsCompany.status || (eqsCompany.is_active ? 'active' : 'inactive') || fromToken.status)
+        }
+      }
+    } catch {
+      // Ignore and fallback to token.
     }
 
-    throw new Error('Unable to get company information from API')
-  } catch (error) {
-    console.error('Error fetching current user company:', error)
-    // Return hardcoded company for development/testing
-    return {
-      fteid: 'COM-1b6043d0-05ee-434a-8b6c-f32f097e485c',
-      name: 'Development Company',
-      company_code: 'DEV-001',
-      status: 'active'
-    }
+    return fromToken
   }
+
+  const hierarchy = await realApiService.getCompanyHierarchy()
+  const data = hierarchy?.data as any
+  const company = data?.company || data?.parent_company || data?.companyInfo
+
+  if (company?.fteid) {
+    const resolved = {
+      fteid: String(company.fteid),
+      name: String(company.name || ''),
+      company_code: String(company.company_code || company.companyCode || ''),
+      status: String(company.status || 'active')
+    }
+    try {
+      const entityResponse = await realApiService.getCompanyDetailsEntityService(resolved.fteid)
+      const entityCompany = entityResponse?.data?.[0]
+      if (entityCompany?.fteid) {
+        return {
+          fteid: String(entityCompany.fteid),
+          name: String(entityCompany.name || resolved.name || ''),
+          company_code: String(entityCompany.company_code || resolved.company_code || ''),
+          status: String(entityCompany.status || (entityCompany.is_active ? 'active' : 'inactive') || resolved.status)
+        }
+      }
+    } catch {
+      // Ignore and fallback to resolved company.
+    }
+    return resolved
+  }
+
+  const branch = data?.total_branches?.[0]
+  const branchCompanyFteid = branch?.company_fteid || branch?.companyFteid
+  if (branchCompanyFteid) {
+    const resolved = {
+      fteid: String(branchCompanyFteid),
+      name: String(branch?.company_name || branch?.companyName || ''),
+      company_code: String(branch?.company_code || branch?.companyCode || ''),
+      status: String(branch?.company_status || branch?.companyStatus || 'active')
+    }
+    try {
+      const entityResponse = await realApiService.getCompanyDetailsEntityService(resolved.fteid)
+      const entityCompany = entityResponse?.data?.[0]
+      if (entityCompany?.fteid) {
+        return {
+          fteid: String(entityCompany.fteid),
+          name: String(entityCompany.name || resolved.name || ''),
+          company_code: String(entityCompany.company_code || resolved.company_code || ''),
+          status: String(entityCompany.status || (entityCompany.is_active ? 'active' : 'inactive') || resolved.status)
+        }
+      }
+    } catch {
+      // Ignore and fallback to resolved company.
+    }
+    return resolved
+  }
+
+  throw new Error('Unable to resolve company info from company hierarchy')
 }
 
 /**

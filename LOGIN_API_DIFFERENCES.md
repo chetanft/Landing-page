@@ -139,3 +139,6 @@ The **missing `Origin` header** is the most likely cause of the 401 error. The A
 - The `x-ft-unique-id` is different in both requests (as expected - it's unique per request)
 - The successful request came from a browser (Chrome), which automatically adds Origin/Referer headers
 - Postman doesn't automatically add Origin/Referer headers, so you need to add them manually
+
+
+
