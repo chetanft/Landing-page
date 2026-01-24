@@ -13,7 +13,39 @@ interface ProgressItemProps {
 export default function ProgressItem({ metric, globalFilters, isFirst = false, isLast = false }: ProgressItemProps) {
   const navigate = useNavigate()
 
+  const getExternalUrl = () => {
+    const planningBase = 'https://www.freighttiger.com/v10/planning/dashboard'
+    const journeyListing = 'https://www.freighttiger.com/v10/journey/listing'
+    const indentsListing = 'https://www.freighttiger.com/v5/indents/list'
+
+    if (metric.metricId === 'orders.planning.unplanned') {
+      return `${planningBase}?tab=unplanned`
+    }
+    if (metric.metricId === 'orders.planning.planned') {
+      return `${planningBase}?tab=planned`
+    }
+    if (metric.metricId?.startsWith('orders.')) {
+      return planningBase
+    }
+
+    const targetPath = metric.target?.path || ''
+    if (targetPath.includes('/journeys') || targetPath.includes('/tms/journeys')) {
+      return journeyListing
+    }
+    if (targetPath.includes('/indents') || targetPath.includes('/app/indents')) {
+      return indentsListing
+    }
+
+    return null
+  }
+
   const handleClick = () => {
+    const externalUrl = getExternalUrl()
+    if (externalUrl) {
+      window.open(externalUrl, '_blank', 'noopener,noreferrer')
+      return
+    }
+
     const url = buildTargetUrl(metric.target, globalFilters)
     navigate(url)
   }

@@ -113,7 +113,12 @@ const buildRealOrdersLifecycleStages = async (
   globalFilters: GlobalFilters
 ): Promise<LifecycleStage[]> => {
   try {
-    const bucketSummaryPromise = fetchOrdersBucketSummary(globalFilters)
+    const bucketSummaryPromise = fetchOrdersBucketSummary(globalFilters).catch((error) => {
+      if (import.meta.env.DEV) {
+        console.warn('[buildRealOrdersLifecycleStages] Bucket summary failed, continuing with status counts only:', error)
+      }
+      return null
+    })
 
     let counts: Record<string, number | undefined> = {}
     if (branchFteid === '__ALL__') {
