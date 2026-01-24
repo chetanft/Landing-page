@@ -566,6 +566,21 @@ function buildOrdersMasterSearchPayload(
     return payload
   }
 
+  if (globalFilters.dateRange?.start && globalFilters.dateRange?.end) {
+    payload.filters.push(
+      {
+        field: 'CREATED_AT',
+        operator: '>=',
+        value: globalFilters.dateRange.start.getTime()
+      },
+      {
+        field: 'CREATED_AT',
+        operator: '<=',
+        value: globalFilters.dateRange.end.getTime()
+      }
+    )
+  }
+
   return payload
 }
 

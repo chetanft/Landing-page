@@ -171,10 +171,10 @@ function SectionToggle({
         <Icon
           name={isExpanded ? 'chevron-up' : 'chevron-down'}
           size={12}
-          style={{ color: 'inherit' }}
+          style={{ color: 'var(--color-primary)' }}
         />
         <Typography variant="body-primary-regular" style={{
-          color: 'inherit',
+          color: 'var(--color-primary)',
           fontSize: 'var(--font-size-xs)',
           textTransform: 'uppercase',
           letterSpacing: 'calc(var(--spacing-x1) / 8)'
@@ -232,7 +232,7 @@ function HeaderRow({
               <Typography variant="body-primary-semibold" color="primary" style={{
                 fontSize: 'var(--font-size-sm)',
                 flex: 1,
-                color: 'var(--text-primary)'
+                color: 'var(--color-secondary)'
               }}>
                 {stage.title}
               </Typography>

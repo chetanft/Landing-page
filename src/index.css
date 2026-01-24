@@ -36,10 +36,21 @@ body {
 
 .date-picker-wrapper input.bg-transparent {
   width: 100% !important;
+  color: var(--color-primary) !important;
 }
 
 .date-picker-wrapper div.flex {
   width: 100% !important;
+}
+
+/* Date picker value visibility */
+.date-picker-wrapper input {
+  color: var(--text-primary) !important;
+  font-weight: 500 !important;
+}
+
+.date-picker-wrapper input::placeholder {
+  color: var(--tertiary) !important;
 }
 
 .search-input-wrapper > * {
@@ -146,13 +157,35 @@ p.font-sans.text-md-rem.font-semibold[style*="fontSize"]:not([style*="color"]) {
   color: var(--text-secondary) !important;
 }
 
+/* Typography body-primary-semibold color="primary" override */
+/* Targets Typography components with body-primary-semibold variant and color="primary" prop */
+/* Changes color from rgb(0, 0, 0) to var(--color-primary) */
+/* This rule targets p elements with font-sans, text-md-rem, and font-semibold classes */
+/* Specifically targets elements with fontSize: var(--font-size-md) in style but no explicit color (color="primary" prop) */
+/* This rule comes after the secondary rule and has higher specificity for fontSize-md, so it takes precedence */
+p.font-sans.text-md-rem.font-semibold[style*="font-size"][style*="var(--font-size-md)"]:not([style*="color"]) {
+  color: var(--color-primary) !important;
+}
+
+/* Typography body-secondary-medium color="secondary" override */
+/* Targets Typography components with body-secondary-medium variant and color="secondary" prop */
+/* Changes color from rgb(0, 0, 0) to var(--color-secondary) */
+/* This rule targets p elements with font-sans, text-sm-rem, and font-medium classes */
+/* Specifically targets elements with fontSize: var(--font-size-sm) in style (color="secondary" prop) */
+/* Note: This targets secondary instances which use fontSize-sm, while tertiary uses fontSize-xs */
+p.font-sans.text-sm-rem.font-medium[style*="fontSize"][style*="var(--font-size-sm)"]:not([style*="color"]),
+p.font-sans.text-sm-rem.font-medium[style*="font-size"][style*="var(--font-size-sm)"]:not([style*="color"]) {
+  color: var(--color-secondary) !important;
+}
+
 /* Typography body-secondary-medium color="tertiary" override */
 /* Targets Typography components with body-secondary-medium variant and color="tertiary" prop */
-/* Changes color from rgb(0, 0, 0) to var(--text-tertiary) */
+/* Changes color from rgb(0, 0, 0) to var(--color-tertiary) */
 /* This rule targets p elements with font-sans, text-sm-rem, and font-medium classes */
-/* Specifically targets elements with fontSize in style (color="tertiary" prop) */
-p.font-sans.text-sm-rem.font-medium[style*="fontSize"] {
-  color: var(--text-tertiary) !important;
+/* Specifically targets elements with fontSize: var(--font-size-xs) in style (color="tertiary" prop) */
+/* Note: This targets tertiary instances which use fontSize-xs, while secondary uses fontSize-sm */
+p.font-sans.text-sm-rem.font-medium[style*="var(--font-size-xs)"]:not([style*="color"]) {
+  color: var(--color-tertiary) !important;
 }
 
 /* FilterOption Typography color override - targets Typography with body-primary-regular variant */
@@ -234,4 +267,82 @@ header span.flex.items-center.justify-center.font-medium {
   50% {
     opacity: 0.5;
   }
+}
+
+/* FT Loader layout for post-login auth loading screen */
+.ft-loader-container {
+  width: 100% !important;
+}
+
+.ft-auth-loader {
+  width: 240px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.ft-auth-loader__icon {
+  width: 240px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Ensure loader logo is centered within the wider container */
+.ft-auth-loader__graphic {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Hide the Loader's built-in progress bar to avoid double bars */
+.ft-auth-loader__graphic > div:last-child {
+  display: none;
+}
+
+/* Keep the FT Loader icon size steady */
+.ft-auth-loader__icon svg {
+  width: 90px !important;
+  height: 90px !important;
+}
+
+/* Progress bar that fills to 100% in 3 seconds */
+.ft-auth-progress {
+  width: 100%;
+  height: 6px;
+  background: var(--border-muted, #e5e7eb);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.ft-auth-progress__bar {
+  width: 0%;
+  height: 100%;
+  background: var(--primary, #1d4ed8);
+  animation: ft-auth-progress-fill 3s linear forwards;
+}
+
+@keyframes ft-auth-progress-fill {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+/* Calendar component styling - Change 1: gap 16px */
+/* Targets the div.flex container inside Calendar component (main flex container) */
+/* Adds gap: 16px to the flex container */
+/* Based on element path: div#datepicker-portal-container > div.fixed z-[9999] > div.bg-[var(--bg-primary)]... > div.flex */
+#datepicker-portal-container div.fixed > div > div.flex:not(.flex-col) {
+  gap: 16px !important;
+}
+
+/* Calendar component styling - Change 2: width 240px */
+/* Targets the div.flex element with Created Date label inside Calendar component */
+/* Changes width from 145.555px to 240px */
+/* This targets the date input field container that has items-center, justify-between, cursor-pointer, and border classes */
+#datepicker-portal-container div.flex.items-center.justify-between.cursor-pointer.border {
+  width: 240px !important;
 }

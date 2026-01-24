@@ -456,6 +456,46 @@ export class AuthApiService {
   }
 
   /**
+   * Refresh desk token (uses desk token + refresh token)
+   */
+  static async refreshDeskToken(refreshToken: string, deskToken: string): Promise<DeskTokenResponse> {
+    try {
+      const url = buildAuthApiUrl('/api/authentication/v1/auth/refresh')
+      if (import.meta.env.DEV) {
+        console.log('[AuthApiService] Calling refreshDeskToken API:', { url })
+      }
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          // FT app sends desk token in `token` header for refresh
+          'token': deskToken
+        },
+        body: JSON.stringify({
+          refresh_token: refreshToken,
+          app_id: 'web'
+        })
+      })
+
+      const data = await this.handleResponse<any>(response)
+      const authToken = data?.auth_token || data?.data?.auth_token
+      if (!authToken) {
+        throw new AuthenticationError('Invalid response from desk refresh token API')
+      }
+      return {
+        auth_token: authToken,
+        refresh_token: data?.refresh_token || data?.data?.refresh_token
+      }
+    } catch (error) {
+      if (error instanceof AuthenticationError) {
+        throw error
+      }
+      throw new AuthenticationError('Network error during desk token refresh')
+    }
+  }
+
+  /**
    * Logout user (invalidate token on server)
    */
   static async logout(): Promise<void> {

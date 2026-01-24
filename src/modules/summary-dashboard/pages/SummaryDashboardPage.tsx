@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
-import { Typography, Row, Col, Spacer, Card, QuickFilters, QuickFilter, FilterOption } from 'ft-design-system'
+import { Typography, Row, Col, Spacer, Card, QuickFilters, QuickFilter, FilterOption, Loader } from 'ft-design-system'
 import type { TabId, GlobalFilters } from '../types/metrics'
 import AppHeader from '../components/AppHeader'
 import TitleBar from '../components/TitleBar'
@@ -15,8 +15,8 @@ import { useOrdersTableData } from '../hooks/useOrdersTableData'
 
 const ALL_TABS: { id: TabId; label: string }[] = [
   { id: 'orders', label: 'Orders' },
-  { id: 'journeys', label: 'Journeys' },
-  { id: 'shipments', label: 'Shipments' },
+  { id: 'journeys', label: 'FTL' },
+  { id: 'shipments', label: 'PTL' },
   { id: 'invoices', label: 'Invoices' },
 ]
 

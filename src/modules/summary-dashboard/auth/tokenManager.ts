@@ -55,6 +55,18 @@ export class TokenManager {
   }
 
   /**
+   * Get stored desk refresh token
+   */
+  static getDeskRefreshToken(): string | null {
+    try {
+      return localStorage.getItem(this.DESK_REFRESH_TOKEN_KEY)
+    } catch (error) {
+      console.warn('Error accessing localStorage for desk refresh token:', error)
+      return null
+    }
+  }
+
+  /**
    * Get stored refresh token
    */
   static getRefreshToken(): string | null {
@@ -237,5 +249,12 @@ export class TokenManager {
    */
   static hasRefreshToken(): boolean {
     return !!this.getRefreshToken()
+  }
+
+  /**
+   * Check if desk refresh token is available
+   */
+  static hasDeskRefreshToken(): boolean {
+    return !!this.getDeskRefreshToken()
   }
 }

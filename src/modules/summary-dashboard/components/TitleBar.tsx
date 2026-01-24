@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useState } from 'react'
 import { Icon, Input, InputField, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Typography, Row, Col, DatePicker } from 'ft-design-system'
 import type { GlobalFilters } from '../types/metrics'
 import { useConsignors } from '../hooks/useConsignors'
@@ -10,6 +11,11 @@ interface TitleBarProps {
 
 export default function TitleBar({ globalFilters, onFiltersChange }: TitleBarProps) {
   const { consignors, isLoading: consignorsLoading } = useConsignors()
+  const [localDateRange, setLocalDateRange] = useState(globalFilters.dateRange)
+
+  useEffect(() => {
+    setLocalDateRange(globalFilters.dateRange)
+  }, [globalFilters.dateRange.start, globalFilters.dateRange.end])
 
   const handleLocationChange = (value: string | number) => {
     const normalizedValue = String(value ?? '')
@@ -30,24 +36,36 @@ export default function TitleBar({ globalFilters, onFiltersChange }: TitleBarPro
     })
   }
 
+  const updateDateRange = useCallback(
+    (next: { start?: Date; end?: Date }) => {
+      setLocalDateRange((prev) => {
+        const updated = {
+          start: next.start ?? prev.start,
+          end: next.end ?? prev.end
+        }
+        onFiltersChange({ dateRange: updated })
+        return updated
+      })
+    },
+    [onFiltersChange]
+  )
+
+  const parseDateValue = (value: string): Date | null => {
+    if (!value) return null
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+
   const handleStartDateChange = (value: string) => {
-    const newStartDate = new Date(value)
-    onFiltersChange({
-      dateRange: {
-        start: newStartDate,
-        end: globalFilters.dateRange.end
-      }
-    })
+    const newStartDate = parseDateValue(value)
+    if (!newStartDate) return
+    updateDateRange({ start: newStartDate })
   }
 
   const handleEndDateChange = (value: string) => {
-    const newEndDate = new Date(value)
-    onFiltersChange({
-      dateRange: {
-        start: globalFilters.dateRange.start,
-        end: newEndDate
-      }
-    })
+    const newEndDate = parseDateValue(value)
+    if (!newEndDate) return
+    updateDateRange({ end: newEndDate })
   }
 
   return (
@@ -86,8 +104,8 @@ export default function TitleBar({ globalFilters, onFiltersChange }: TitleBarPro
             <div className="date-picker-wrapper" style={{ width: '100%' }}>
               <DatePicker
                 range
-                startValue={globalFilters.dateRange.start.toISOString()}
-                endValue={globalFilters.dateRange.end.toISOString()}
+                startValue={localDateRange.start}
+                endValue={localDateRange.end}
                 onStartChange={handleStartDateChange}
                 onEndChange={handleEndDateChange}
                 placeholder="Select date range"

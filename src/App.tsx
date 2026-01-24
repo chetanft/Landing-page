@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { Loader } from 'ft-design-system'
 import SummaryDashboardPage from './modules/summary-dashboard/pages/SummaryDashboardPage'
 import LoginPage from './modules/summary-dashboard/pages/LoginPage'
 import TestComponent from './TestComponent'
@@ -9,9 +10,58 @@ import { useAuth } from './modules/summary-dashboard/auth/AuthContext'
 function ProtectedRoute({ children }: { children: React.ReactElement }) {
   const { isAuthenticated, isLoading } = useAuth()
   const location = useLocation()
+  const [showLoader, setShowLoader] = useState(isLoading)
+  const [loaderStartTime, setLoaderStartTime] = useState<number | null>(isLoading ? Date.now() : null)
+  const loaderKey = loaderStartTime ?? 'idle'
 
-  if (isLoading) {
-    return <div>Loading...</div>
+  useEffect(() => {
+    if (isLoading) {
+      // Start showing loader and record start time once
+      if (loaderStartTime === null) {
+        setLoaderStartTime(Date.now())
+      }
+      setShowLoader(true)
+    } else if (loaderStartTime !== null) {
+      // Ensure loader shows for at least 3 seconds total
+      const elapsed = Date.now() - loaderStartTime
+      const remaining = Math.max(0, 3000 - elapsed)
+      
+      if (remaining > 0) {
+        const timer = setTimeout(() => {
+          setShowLoader(false)
+          setLoaderStartTime(null)
+        }, remaining)
+        return () => clearTimeout(timer)
+      } else {
+        // Already been 3+ seconds, hide immediately
+        setShowLoader(false)
+        setLoaderStartTime(null)
+      }
+    }
+  }, [isLoading, loaderStartTime])
+
+  if (isLoading || showLoader) {
+    return (
+      <div 
+        className="ft-loader-container"
+        style={{ 
+          minHeight: '100vh', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          padding: 'var(--spacing-x4)'
+        }}
+      >
+        <div className="ft-auth-loader" key={loaderKey}>
+          <div className="ft-auth-loader__icon">
+            <Loader className="ft-auth-loader__graphic" logoSize={120} />
+          </div>
+          <div className="ft-auth-progress" aria-hidden="true">
+            <div className="ft-auth-progress__bar" />
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (!isAuthenticated) {

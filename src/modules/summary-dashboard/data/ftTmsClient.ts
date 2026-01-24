@@ -155,6 +155,31 @@ export const ftTmsFetch = async (pathOrUrl: string, options: RequestInit = {}): 
     headers: applyAuthHeaders(token)
   })
 
+  if (response.status === 401 && !didRetry && usingDeskToken && TokenManager.hasDeskRefreshToken()) {
+    try {
+      const refreshToken = TokenManager.getDeskRefreshToken()
+      const currentDeskToken = TokenManager.getDeskToken()
+      if (refreshToken && currentDeskToken) {
+        const refreshResponse = await AuthApiService.refreshDeskToken(refreshToken, currentDeskToken)
+        TokenManager.setDeskTokens({
+          accessToken: refreshResponse.auth_token || currentDeskToken,
+          refreshToken: refreshResponse.refresh_token || refreshToken,
+          expiresAt: Date.now() + (12 * 60 * 60 * 1000)
+        })
+        response = await fetch(url, {
+          ...options,
+          credentials: 'include',
+          headers: applyAuthHeaders(refreshResponse.auth_token || currentDeskToken),
+          ...( { __retried: true } as unknown as RequestInit )
+        })
+      }
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.warn('[ftTmsFetch] Desk token refresh after 401 failed')
+      }
+    }
+  }
+
   if (response.status === 401 && !didRetry && !usingDeskToken && TokenManager.hasRefreshToken()) {
     try {
       const refreshToken = TokenManager.getRefreshToken()

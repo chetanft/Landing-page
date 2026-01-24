@@ -50,14 +50,13 @@ export const fetchIndentsCount = async (globalFilters: GlobalFilters): Promise<I
 export const fetchIndentsCountFromAPI = async (globalFilters: GlobalFilters): Promise<IndentItem[]> => {
   const baseUrl = buildFtTmsUrl('/api/cyclops/indent/consignor/list/count')
 
-  // Format dates for the API (assuming similar format as journey API)
   const params = new URLSearchParams()
+  const bodyPayload: Record<string, unknown> = {}
 
-  // Add date range filters if needed
-  if (globalFilters.dateRange) {
-    // The API might accept date filters - adding placeholder for future implementation
-    // params.append('start_date', globalFilters.dateRange.start.toISOString())
-    // params.append('end_date', globalFilters.dateRange.end.toISOString())
+  // Add date range filters if provided (millisecond timestamps)
+  if (globalFilters.dateRange?.start && globalFilters.dateRange?.end) {
+    bodyPayload.from_date = globalFilters.dateRange.start.getTime()
+    bodyPayload.to_date = globalFilters.dateRange.end.getTime()
   }
 
   // Add location filter if specified
@@ -102,7 +101,7 @@ export const fetchIndentsCountFromAPI = async (globalFilters: GlobalFilters): Pr
       method: 'POST',
       credentials: 'include',
       headers,
-      body: JSON.stringify({})
+      body: JSON.stringify(bodyPayload)
     })
     
     if (!response.ok) {
