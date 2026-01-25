@@ -34,6 +34,16 @@ body {
   width: 100% !important;
 }
 
+/* Ensure DatePicker interactive elements are clickable */
+.date-picker-wrapper input,
+.date-picker-wrapper button,
+.date-picker-wrapper [role="combobox"],
+.date-picker-wrapper [role="button"],
+.date-picker-wrapper .cursor-pointer {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+}
+
 .date-picker-wrapper input.bg-transparent {
   width: 100% !important;
   color: var(--color-primary) !important;
@@ -228,6 +238,7 @@ p.font-sans.text-sm-rem.font-medium[style*="var(--font-size-xs)"]:not([style*="c
 /* Changes height from 56px to 64px */
 header.bg-\[var\(--bg-secondary\)\] {
   height: 64px !important;
+  width: 100% !important;
 }
 
 /* AppHeader SVG styling */
@@ -304,6 +315,15 @@ header span.flex.items-center.justify-center.font-medium {
   display: none;
 }
 
+/* Loader absolute positioned div styling */
+/* Targets the div.absolute with positioning classes inside Loader component */
+/* Changes: display flex, justify-content center, align-items center */
+.ft-auth-loader__graphic div.absolute[class*="bottom-"] {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
 /* Keep the FT Loader icon size steady */
 .ft-auth-loader__icon svg {
   width: 90px !important;
@@ -326,6 +346,12 @@ header span.flex.items-center.justify-center.font-medium {
   animation: ft-auth-progress-fill 3s linear forwards;
 }
 
+/* Freeze mode: Stop progress bar animation and keep it at 50% */
+.ft-loader-container.freeze-mode .ft-auth-progress__bar {
+  width: 50% !important;
+  animation: none !important;
+}
+
 @keyframes ft-auth-progress-fill {
   from { width: 0%; }
   to { width: 100%; }
@@ -345,4 +371,28 @@ header span.flex.items-center.justify-center.font-medium {
 /* This targets the date input field container that has items-center, justify-between, cursor-pointer, and border classes */
 #datepicker-portal-container div.flex.items-center.justify-between.cursor-pointer.border {
   width: 240px !important;
+}
+
+/* Ensure custom date option buttons are clickable */
+#datepicker-portal-container button[data-custom-date-option] {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  z-index: 1 !important;
+  position: relative !important;
+  transition: background-color 0.15s ease !important;
+}
+
+#datepicker-portal-container button[data-custom-date-option]:hover {
+  background-color: var(--border-secondary) !important;
+  pointer-events: auto !important;
+}
+
+#datepicker-portal-container button[data-custom-date-option]:active {
+  background-color: var(--bg-secondary) !important;
+}
+
+/* Prevent flickering by ensuring stable positioning */
+#datepicker-portal-container button[data-custom-date-option] {
+  will-change: auto !important;
+  transform: translateZ(0) !important;
 }

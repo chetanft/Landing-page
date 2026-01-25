@@ -14,6 +14,7 @@ export interface UserContext {
   branchId: string
   userRole: string
   userId: string
+  userFteid?: string
   email: string
   name?: string
   permissions?: string[]

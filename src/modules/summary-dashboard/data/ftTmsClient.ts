@@ -26,8 +26,10 @@ export const resolveUserContext = (token?: string | null): UserContext | null =>
       const ucv = decoded?.ucv || {}
       const firstName = ucv.firstName ?? ucv.firstname
       const lastName = ucv.lastName ?? ucv.lastname
+      const userFteid = ucv.fteid ?? ucv.user_fteid ?? decoded.user_fteid ?? decoded.fteid
       return {
         userId: String(ucv.id ?? decoded.sub ?? decoded.userId ?? 'unknown'),
+        userFteid: userFteid ? String(userFteid) : undefined,
         email: String(ucv.email ?? decoded.email ?? 'unknown'),
         name: firstName && lastName
           ? `${firstName} ${lastName}`
@@ -71,6 +73,8 @@ export const ftTmsFetch = async (pathOrUrl: string, options: RequestInit = {}): 
   const didRetry = (options as { __retried?: boolean }).__retried === true
   const isBranchFteid = (value?: string | null) =>
     Boolean(value && (value.startsWith('BRH-') || value.startsWith('BRN-')))
+  const isFteid = (value?: string | null) =>
+    Boolean(value && /^[A-Z]{3}-[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$/i.test(value))
 
   const applyAuthHeaders = (tokenValue: string | null) => {
     const headers: Record<string, string> = {
@@ -95,7 +99,12 @@ export const ftTmsFetch = async (pathOrUrl: string, options: RequestInit = {}): 
       headers['X-User-Role'] = userContext.userRole
       headers['X-User-Id'] = userContext.userId
       headers['X-FT-ORGID'] = userContext.orgId
-      headers['X-FT-USERID'] = userContext.userId
+      const ftUserId = isFteid(userContext.userFteid)
+        ? userContext.userFteid
+        : (isFteid(userContext.userId) ? userContext.userId : undefined)
+      if (ftUserId) {
+        headers['X-FT-USERID'] = ftUserId
+      }
       if (isBranchFteid(userContext.branchId)) {
         headers['X-Branch-Id'] = userContext.branchId
       }

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { Typography, Row, Col, Spacer, Card, QuickFilters, QuickFilter, FilterOption, Loader } from 'ft-design-system'
 import type { TabId, GlobalFilters } from '../types/metrics'
 import AppHeader from '../components/AppHeader'
@@ -12,6 +12,7 @@ import OrderDetailsDrawer from '../components/OrderDetailsDrawer'
 import { useMetricsData } from '../data/useMetricsData'
 import { usePermissions } from '../hooks/usePermissions'
 import { useOrdersTableData } from '../hooks/useOrdersTableData'
+import { useAppLoader } from '../../../AppLoaderContext'
 
 const ALL_TABS: { id: TabId; label: string }[] = [
   { id: 'orders', label: 'Orders' },
@@ -29,6 +30,8 @@ const getDefaultDateRange = () => {
 
 export default function SummaryDashboardPage() {
   const { availableTabs, canAccessTab } = usePermissions()
+  const { setAppLoading } = useAppLoader()
+  const [hasInitialLoadCompleted, setHasInitialLoadCompleted] = useState(false)
   const tabs = useMemo(() => {
     return ALL_TABS.filter((tab) => canAccessTab(tab.id))
   }, [canAccessTab])
@@ -55,6 +58,18 @@ export default function SummaryDashboardPage() {
   })
 
   const { tabData, isLoading, error, refetch } = useMetricsData(activeTab, globalFilters)
+
+  useEffect(() => {
+    if (!hasInitialLoadCompleted && isLoading) {
+      setAppLoading(true)
+      return
+    }
+
+    if (!hasInitialLoadCompleted && !isLoading) {
+      setHasInitialLoadCompleted(true)
+      setAppLoading(false)
+    }
+  }, [hasInitialLoadCompleted, isLoading, setAppLoading])
 
   // Fetch orders data for quick filter counts (only when orders tab is active)
   const { summary: ordersSummary } = useOrdersTableData({
@@ -183,6 +198,10 @@ export default function SummaryDashboardPage() {
     setIsDrawerOpen(false)
     setSelectedOrderId(null)
   }, [])
+
+  if (!hasInitialLoadCompleted && isLoading) {
+    return null
+  }
 
   if (availableTabs.length === 0) {
     return (

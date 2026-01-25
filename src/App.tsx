@@ -5,6 +5,7 @@ import SummaryDashboardPage from './modules/summary-dashboard/pages/SummaryDashb
 import LoginPage from './modules/summary-dashboard/pages/LoginPage'
 import TestComponent from './TestComponent'
 import { useAuth } from './modules/summary-dashboard/auth/AuthContext'
+import { AppLoaderProvider, useAppLoader } from './AppLoaderContext'
 
 // Protected route wrapper component
 function ProtectedRoute({ children }: { children: React.ReactElement }) {
@@ -13,15 +14,27 @@ function ProtectedRoute({ children }: { children: React.ReactElement }) {
   const [showLoader, setShowLoader] = useState(isLoading)
   const [loaderStartTime, setLoaderStartTime] = useState<number | null>(isLoading ? Date.now() : null)
   const loaderKey = loaderStartTime ?? 'idle'
+  const { isAppLoading } = useAppLoader()
+
+  // FREEZE MODE: Set to true to keep loader visible for editing
+  const FREEZE_LOADER = false
 
   useEffect(() => {
-    if (isLoading) {
+    if (FREEZE_LOADER) {
+      setShowLoader(true)
+      return
+    }
+
+    if (isLoading || isAppLoading) {
       // Start showing loader and record start time once
       if (loaderStartTime === null) {
         setLoaderStartTime(Date.now())
       }
       setShowLoader(true)
-    } else if (loaderStartTime !== null) {
+      return
+    }
+
+    if (loaderStartTime !== null) {
       // Ensure loader shows for at least 3 seconds total
       const elapsed = Date.now() - loaderStartTime
       const remaining = Math.max(0, 3000 - elapsed)
@@ -32,44 +45,72 @@ function ProtectedRoute({ children }: { children: React.ReactElement }) {
           setLoaderStartTime(null)
         }, remaining)
         return () => clearTimeout(timer)
-      } else {
-        // Already been 3+ seconds, hide immediately
-        setShowLoader(false)
-        setLoaderStartTime(null)
       }
-    }
-  }, [isLoading, loaderStartTime])
 
-  if (isLoading || showLoader) {
-    return (
-      <div 
-        className="ft-loader-container"
-        style={{ 
-          minHeight: '100vh', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          padding: 'var(--spacing-x4)'
-        }}
-      >
-        <div className="ft-auth-loader" key={loaderKey}>
-          <div className="ft-auth-loader__icon">
-            <Loader className="ft-auth-loader__graphic" logoSize={120} />
-          </div>
-          <div className="ft-auth-progress" aria-hidden="true">
-            <div className="ft-auth-progress__bar" />
-          </div>
-        </div>
-      </div>
-    )
-  }
+      // Already been 3+ seconds, hide immediately
+      setShowLoader(false)
+      setLoaderStartTime(null)
+    }
+  }, [isLoading, isAppLoading, loaderStartTime])
 
   if (!isAuthenticated) {
     // Redirect to login page, preserving the intended destination
+    if (isLoading) {
+      return (
+        <div
+          className={`ft-loader-container ${FREEZE_LOADER ? 'freeze-mode' : ''}`}
+          style={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 'var(--spacing-x4)'
+          }}
+        >
+          <div className="ft-auth-loader" key={loaderKey}>
+            <div className="ft-auth-loader__icon">
+              <Loader className="ft-auth-loader__graphic" logoSize={120} />
+            </div>
+            <div className="ft-auth-progress" aria-hidden="true">
+              <div className="ft-auth-progress__bar" />
+            </div>
+          </div>
+        </div>
+      )
+    }
+
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  return children
+  return (
+    <>
+      {children}
+      {(FREEZE_LOADER || isLoading || showLoader || isAppLoading) && (
+        <div
+          className={`ft-loader-container ${FREEZE_LOADER ? 'freeze-mode' : ''}`}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 'var(--spacing-x4)',
+            backgroundColor: 'var(--bg-primary)',
+            zIndex: 9999
+          }}
+        >
+          <div className="ft-auth-loader" key={loaderKey}>
+            <div className="ft-auth-loader__icon">
+              <Loader className="ft-auth-loader__graphic" logoSize={120} />
+            </div>
+            <div className="ft-auth-progress" aria-hidden="true">
+              <div className="ft-auth-progress__bar" />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
 }
 
 function App() {
@@ -106,20 +147,22 @@ function App() {
   }, [])
 
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/test" element={<TestComponent />} />
-      <Route
-        path="/v10/summarydashboard"
-        element={
-          <ProtectedRoute>
-            <SummaryDashboardPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+    <AppLoaderProvider>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/test" element={<TestComponent />} />
+        <Route
+          path="/v10/summarydashboard"
+          element={
+            <ProtectedRoute>
+              <SummaryDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </AppLoaderProvider>
   )
 }
 

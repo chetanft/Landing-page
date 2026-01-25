@@ -628,6 +628,8 @@ export const authUtils = {
 
     const userContext: UserContext = {
       userId: response.user.id,
+      userFteid: (response.user as { fteid?: string; userFteid?: string }).fteid
+        || (response.user as { fteid?: string; userFteid?: string }).userFteid,
       email: response.user.email,
       name: response.user.name,
       orgId: response.user.organizationId,
@@ -654,6 +656,8 @@ export const authUtils = {
     if (response.user) {
       userContext = {
         userId: response.user.id,
+        userFteid: (response.user as { fteid?: string; userFteid?: string }).fteid
+          || (response.user as { fteid?: string; userFteid?: string }).userFteid,
         email: response.user.email,
         name: response.user.name,
         orgId: response.user.organizationId,

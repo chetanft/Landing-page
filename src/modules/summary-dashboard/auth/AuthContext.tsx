@@ -81,8 +81,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const ucv = decoded?.ucv || {}
             const firstName = ucv.firstname || ucv.firstName || ''
             const lastName = ucv.lastname || ucv.lastName || ''
+            const userFteid = ucv.fteid ?? ucv.user_fteid ?? decoded?.user_fteid ?? decoded?.fteid
             const realUser = {
               userId: String(ucv.id ?? decoded?.sub ?? decoded?.userId ?? 'unknown'),
+              userFteid: userFteid ? String(userFteid) : undefined,
               email: ucv.email ?? decoded?.email ?? 'unknown',
               name: firstName && lastName 
                 ? `${firstName} ${lastName}` 

@@ -3,8 +3,9 @@ import type { TabId, TabData, GlobalFilters } from '../types/metrics'
 import { fetchTabMetrics } from './metricsService'
 import { isAuthError } from '../utils/apiUtils'
 
-const STALE_TIME = 30000 // 30 seconds
-const REFETCH_INTERVAL = 60000 // 60 seconds
+const STALE_TIME = 5 * 60 * 1000 // 5 minutes
+const REFETCH_INTERVAL = 0 // disabled to avoid periodic refetch
+const GC_TIME = 10 * 60 * 1000 // keep cache 10 minutes
 
 interface UseMetricsDataResult {
   tabData: TabData | null
@@ -34,7 +35,9 @@ export const useMetricsData = (
     queryFn: () => fetchTabMetrics(tab, globalFilters),
     enabled: true,
     staleTime: STALE_TIME,
-    refetchInterval: REFETCH_INTERVAL,
+    gcTime: GC_TIME,
+    refetchInterval: REFETCH_INTERVAL || false,
+    refetchOnWindowFocus: false,
     retry: (failureCount, error) => {
       // Don't retry authentication errors
       if (isAuthError(error)) {

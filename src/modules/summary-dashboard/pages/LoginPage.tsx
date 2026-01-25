@@ -477,7 +477,7 @@ export default function LoginPage() {
             height: '24px'
           }}>
             <Typography variant="body-secondary-regular" style={{ 
-              color: 'var(--text-tertiary)',
+              color: 'var(--color-tertiary)',
               fontSize: '13px',
               fontWeight: 400
             }}>
@@ -513,7 +513,7 @@ export default function LoginPage() {
               backgroundColor: 'var(--text-secondary)'
             }} />
             <Typography variant="body-secondary-semibold" style={{ 
-              color: 'var(--text-secondary)',
+              color: 'var(--color-primary)',
               fontSize: '14px'
             }}>
               What's New?
