@@ -56,7 +56,7 @@ body {
 /* Date picker value visibility */
 .date-picker-wrapper input {
   color: var(--text-primary) !important;
-  font-weight: 500 !important;
+  font-weight: 400 !important;
 }
 
 .date-picker-wrapper input::placeholder {
@@ -144,8 +144,10 @@ h1.font-sans.font-normal {
 /* Typography display-primary variant color override */
 /* Targets Typography components with display-primary variant and color="primary" */
 /* Changes color from rgb(67, 79, 100) to var(--primary) */
+/* Changes font-size from 20.006px to 16px */
 div.font-sans.text-lg-rem.font-semibold {
   color: var(--primary) !important;
+  font-size: 16px !important;
 }
 
 /* Typography body-primary-regular date/time color override */
@@ -195,6 +197,28 @@ p.font-sans.text-sm-rem.font-medium[style*="font-size"][style*="var(--font-size-
 /* Specifically targets elements with fontSize: var(--font-size-xs) in style (color="tertiary" prop) */
 /* Note: This targets tertiary instances which use fontSize-xs, while secondary uses fontSize-sm */
 p.font-sans.text-sm-rem.font-medium[style*="var(--font-size-xs)"]:not([style*="color"]) {
+  color: var(--color-tertiary) !important;
+}
+
+/* Typography body-secondary-regular color="secondary" override */
+/* Targets Typography components with body-secondary-regular variant and color="secondary" prop */
+/* Changes color from rgb(131, 140, 157) to var(--color-secondary) */
+/* This rule targets p elements with font-sans, text-sm-rem, and font-normal classes */
+/* Specifically targets elements with fontSize: var(--font-size-sm) in style (color="secondary" prop) */
+/* Excludes elements with fontStyle: italic to avoid conflict with tertiary rule */
+p.font-sans.text-sm-rem.font-normal[style*="fontSize"][style*="var(--font-size-sm)"]:not([style*="color"]):not([style*="italic"]),
+p.font-sans.text-sm-rem.font-normal[style*="font-size"][style*="var(--font-size-sm)"]:not([style*="color"]):not([style*="italic"]) {
+  color: var(--color-secondary) !important;
+}
+
+/* Typography body-secondary-regular color="tertiary" override */
+/* Targets Typography components with body-secondary-regular variant and color="tertiary" prop */
+/* Changes color from rgb(0, 0, 0) to var(--color-tertiary) */
+/* This rule targets p elements with font-sans, text-sm-rem, and font-normal classes */
+/* Specifically targets elements with fontSize: var(--font-size-sm) in style (color="tertiary" prop) */
+/* Tertiary instances typically have fontStyle: italic, so this rule targets those */
+p.font-sans.text-sm-rem.font-normal[style*="fontSize"][style*="var(--font-size-sm)"][style*="italic"]:not([style*="color"]),
+p.font-sans.text-sm-rem.font-normal[style*="font-size"][style*="var(--font-size-sm)"][style*="italic"]:not([style*="color"]) {
   color: var(--color-tertiary) !important;
 }
 
@@ -272,12 +296,12 @@ header div.relative.inline-flex.w-fit div[style*="z-index: 1000"] {
 
 /* UserProfileDropdown styling changes */
 /* Change 1-3: Target the main content container div with flex-col */
-/* Changes: padding-left 20px -> 16px, padding-right 20px -> 0px, gap 16px -> 8px */
+/* Changes: padding-left 20px -> 16px, padding-right 20px -> 16px, gap 16px -> 8px */
 /* Targets: div.box-border.content-stretch.flex.flex-col.gap-[16px].items-start.px-[var(--x5,20px)] */
 header div.relative.inline-flex.w-fit > div.bg-\[var\(--bg-primary\)\] > div.box-border.flex.flex-col.items-start,
 header div.bg-\[var\(--bg-primary\)\] div.box-border.flex.flex-col.items-start[class*="px-\[var\(--x5"] {
   padding-left: 16px !important;
-  padding-right: 0px !important;
+  padding-right: 16px !important;
   gap: 8px !important;
 }
 
@@ -299,6 +323,14 @@ header div.relative.inline-flex.w-fit > div.bg-\[var\(--bg-primary\)\].flex.flex
 header div.bg-\[var\(--bg-primary\)\].flex.flex-col.items-center.overflow-hidden.px-0[class*="py-\[20px\]"] {
   padding-top: 16px !important;
   padding-bottom: 16px !important;
+}
+
+/* UserProfileDropdown button width override */
+/* Change: width 384px -> 100% */
+/* Targets: button.bg-[var(--bg-primary)] inside UserProfileDropdown */
+header div.relative.inline-flex.w-fit > div.bg-\[var\(--bg-primary\)\] button.bg-\[var\(--bg-primary\)\],
+header div.bg-\[var\(--bg-primary\)\] button.bg-\[var\(--bg-primary\)\].box-border.content-stretch {
+  width: 100% !important;
 }
 
 /* TitleBar z-index - ensure it's below the header */
@@ -447,6 +479,7 @@ header span.flex.items-center.justify-center.font-medium {
   z-index: 1 !important;
   position: relative !important;
   transition: background-color 0.15s ease !important;
+  font-size: 16px !important;
 }
 
 #datepicker-portal-container button[data-custom-date-option]:hover {
