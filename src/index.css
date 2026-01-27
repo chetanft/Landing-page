@@ -236,9 +236,76 @@ p.font-sans.text-sm-rem.font-medium[style*="var(--font-size-xs)"]:not([style*="c
 /* AppHeader height override */
 /* Targets the header element inside AppHeader component */
 /* Changes height from 56px to 64px */
+/* Changes width from 812px to 100% (full viewport width) */
+/* Uses viewport width to break out of constrained parent containers */
+/* Sets high z-index to ensure header and its dropdowns appear above TitleBar and other content */
 header.bg-\[var\(--bg-secondary\)\] {
   height: 64px !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  position: relative !important;
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  z-index: 10000 !important;
+}
+
+/* UserProfileDropdown z-index fix */
+/* Ensures the user profile dropdown appears above TitleBar, date picker, and other UI elements */
+/* Must be higher than datepicker portal (9999) and other dropdowns */
+/* Targets dropdowns inside header - using multiple selectors for better coverage */
+header div.bg-\[var\(--bg-primary\)\].flex.flex-col.items-center.overflow-hidden,
+header > div > div.relative > div.bg-\[var\(--bg-primary\)\],
+header div.relative.inline-flex.w-fit > div.bg-\[var\(--bg-primary\)\] {
+  z-index: 10001 !important;
+}
+
+/* Ensure any absolute positioned element in header dropdown container has high z-index */
+/* This targets the UserProfileDropdown specifically */
+header div.relative.inline-flex.w-fit > div[style*="position: absolute"],
+header div.relative.inline-flex.w-fit > div[style*="position:absolute"],
+header div.relative.inline-flex.w-fit div[style*="z-index: 1000"] {
+  z-index: 10001 !important;
+}
+
+/* UserProfileDropdown styling changes */
+/* Change 1-3: Target the main content container div with flex-col */
+/* Changes: padding-left 20px -> 16px, padding-right 20px -> 0px, gap 16px -> 8px */
+/* Targets: div.box-border.content-stretch.flex.flex-col.gap-[16px].items-start.px-[var(--x5,20px)] */
+header div.relative.inline-flex.w-fit > div.bg-\[var\(--bg-primary\)\] > div.box-border.flex.flex-col.items-start,
+header div.bg-\[var\(--bg-primary\)\] div.box-border.flex.flex-col.items-start[class*="px-\[var\(--x5"] {
+  padding-left: 16px !important;
+  padding-right: 0px !important;
+  gap: 8px !important;
+}
+
+/* Change 4-6, 9: Target the divider/separator container div */
+/* Changes: width 400px -> 100%, padding-top/bottom 20px -> 8px, height 41px -> fit-content */
+/* Targets: div.box-border.content-stretch.flex.items-center.justify-between.pl-0.pr-[36px].py-[var(--x5,20px)] */
+header div.relative.inline-flex.w-fit > div.bg-\[var\(--bg-primary\)\] > div.box-border.flex.items-center.justify-between.pl-0,
+header div.bg-\[var\(--bg-primary\)\] div.box-border.flex.items-center.justify-between.pl-0[class*="pr-\[36px\]"] {
   width: 100% !important;
+  padding-top: 16px !important;
+  padding-bottom: 8px !important;
+  height: fit-content !important;
+}
+
+/* Change 7-8: Target the main dropdown container div */
+/* Changes: padding-top/bottom 20px -> 16px */
+/* Targets: div.bg-[var(--bg-primary)].flex.flex-col.items-center.overflow-hidden.px-0.py-[20px] */
+header div.relative.inline-flex.w-fit > div.bg-\[var\(--bg-primary\)\].flex.flex-col.items-center.overflow-hidden.px-0,
+header div.bg-\[var\(--bg-primary\)\].flex.flex-col.items-center.overflow-hidden.px-0[class*="py-\[20px\]"] {
+  padding-top: 16px !important;
+  padding-bottom: 16px !important;
+}
+
+/* TitleBar z-index - ensure it's below the header */
+/* Targets the TitleBar container div that comes after the header */
+div[style*="backgroundColor: var(--bg-primary)"][style*="padding: var(--spacing-x5)"] {
+  position: relative !important;
+  z-index: 1 !important;
 }
 
 /* AppHeader SVG styling */

@@ -62,7 +62,7 @@ export default function DashboardSkeleton() {
                 animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
               }} />
               <div style={{ 
-                width: '40px', 
+                width: '40px',
                 height: '24px', 
                 backgroundColor: 'var(--border-secondary)', 
                 borderRadius: '100px',
@@ -85,7 +85,7 @@ export default function DashboardSkeleton() {
                     animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
                   }} />
                   <div style={{ 
-                    width: '32px', 
+                    width: '32px',
                     height: '20px', 
                     backgroundColor: 'var(--border-secondary)', 
                     borderRadius: 'var(--radius-sm)',

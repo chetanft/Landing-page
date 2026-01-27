@@ -33,14 +33,14 @@ export default function TableSkeleton() {
           marginBottom: 'var(--spacing-x2)'
         }}>
           <div style={{ 
-            width: '200px', 
+            width: '200px',
             height: '20px', 
             backgroundColor: 'var(--border-secondary)', 
             borderRadius: 'var(--radius-sm)',
             animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
           }} />
           <div style={{ 
-            width: '120px', 
+            width: '120px',
             height: '32px', 
             backgroundColor: 'var(--border-secondary)', 
             borderRadius: 'var(--radius-md)',
@@ -65,7 +65,7 @@ export default function TableSkeleton() {
                     }}
                   >
                     <div style={{ 
-                      width: '80px', 
+                      width: '80px',
                       height: '16px', 
                       backgroundColor: 'var(--border-secondary)', 
                       borderRadius: 'var(--radius-sm)',
@@ -108,7 +108,7 @@ export default function TableSkeleton() {
           marginTop: 'var(--spacing-x4)'
         }}>
           <div style={{ 
-            width: '150px', 
+            width: '150px',
             height: '16px', 
             backgroundColor: 'var(--border-secondary)', 
             borderRadius: 'var(--radius-sm)',

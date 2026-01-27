@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { AppHeader as FTAppHeader, type LogoName } from 'ft-design-system'
 import { useAuth } from '../auth/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { getCompanyInfo } from '../data/companyApiService'
+import { useCompanyHierarchy } from '../hooks/useRealApiData'
 
 type CompanyLogoName = LogoName
 
@@ -22,6 +23,7 @@ export default function AppHeader() {
   const navigate = useNavigate()
   const [companyLogoName, setCompanyLogoName] = useState<CompanyLogoName | null>(null)
   const [companyDisplayName, setCompanyDisplayName] = useState('')
+  const { data: hierarchyData } = useCompanyHierarchy()
 
   const handleLogout = () => {
     logout()
@@ -39,6 +41,17 @@ export default function AppHeader() {
 
   const userName = user?.name?.trim() || ''
   const userRole = user?.userRole?.trim() || ''
+
+  // Get branch name from hierarchy data by matching user's branchId
+  const branchName = useMemo(() => {
+    if (!hierarchyData?.data?.total_branches || !user?.branchId) {
+      return null
+    }
+    const branch = hierarchyData.data.total_branches.find(
+      (b) => b.fteid === user.branchId
+    )
+    return branch?.name || null
+  }, [hierarchyData, user?.branchId])
 
   useEffect(() => {
     let isMounted = true
@@ -80,7 +93,15 @@ export default function AppHeader() {
     <FTAppHeader
       size="lg"
       device="Desktop"
-      user={isAuthenticated && user ? { name: userName, role: userRole } : undefined}
+      user={
+        isAuthenticated && user
+          ? {
+              name: userName,
+              role: userRole,
+              location: branchName || undefined,
+            }
+          : undefined
+      }
       userCompany={userCompany}
       onUserMenuItemClick={handleMenuItemClick}
       onNotificationClick={() => {}}
