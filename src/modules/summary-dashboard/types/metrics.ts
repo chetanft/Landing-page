@@ -38,6 +38,7 @@ export interface LifecycleStage {
   metrics: MetricData[]
   exceptions?: MetricData[]
   status?: MetricData[]
+  error?: string
 }
 
 export interface TabData {

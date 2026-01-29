@@ -496,3 +496,12 @@ header span.flex.items-center.justify-center.font-medium {
   will-change: auto !important;
   transform: translateZ(0) !important;
 }
+
+/* Road icon SVG color override */
+/* Targets the SVG element inside Icon component when name="road" */
+/* Changes color from rgb(0, 0, 0) to var(--color-secondary) */
+/* Specifically targets SVG elements with width="14" and height="14" (matching size={14} prop) */
+/* This targets the road icon used in HeaderRow component */
+svg[width="14"][height="14"] {
+  color: var(--color-secondary) !important;
+}

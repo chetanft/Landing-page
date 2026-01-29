@@ -333,16 +333,38 @@ export const fetchShipmentMetricsFromAPI = async (globalFilters: GlobalFilters):
   }
 
   try {
-    // Fetch main shipment bucket summary and PTL orders bucket summary in parallel
-    const [response, ordersBucketData] = await Promise.all([
+    const [responseResult, ordersResult] = await Promise.allSettled([
       ftTmsFetch(url),
       fetchOrdersBucketSummary(globalFilters)
     ])
-    
+
+    if (responseResult.status === 'rejected') {
+      throw responseResult.reason
+    }
+
+    const response = responseResult.value
     if (import.meta.env.DEV) {
       console.log('[fetchShipmentMetricsFromAPI] Response status:', response.status)
-      console.log('[fetchShipmentMetricsFromAPI] Orders bucket data:', ordersBucketData)
     }
+
+    let ordersBucketData: OrdersBucketSummary | null = null
+    let ordersBucketError: string | null = null
+
+    if (ordersResult.status === 'fulfilled') {
+      ordersBucketData = ordersResult.value
+      if (import.meta.env.DEV) {
+        console.log('[fetchShipmentMetricsFromAPI] Orders bucket data:', ordersBucketData)
+      }
+    } else {
+      const ordersError = ordersResult.reason
+      ordersBucketError = ordersError instanceof Error
+        ? `Failed to load orders summary: ${ordersError.message}`
+        : 'Failed to load orders summary'
+      if (import.meta.env.DEV) {
+        console.warn('[fetchShipmentMetricsFromAPI] Orders bucket summary failed', ordersError)
+      }
+    }
+
     const data: ShipmentSummaryApiResponse = await response.json()
 
     if (!data.success) {
@@ -394,7 +416,7 @@ export const fetchShipmentMetricsFromAPI = async (globalFilters: GlobalFilters):
       CANCELLED: ordersBucketData.CANCELLED ?? 0,
     } : null
 
-    return transformShipmentDataToTabData(data, analyticsMap, ordersData, globalFilters)
+    return transformShipmentDataToTabData(data, analyticsMap, ordersData, ordersBucketError, globalFilters)
   } catch (error) {
     console.error('Error fetching shipment metrics from API:', error)
     throw error
@@ -404,12 +426,24 @@ export const fetchShipmentMetricsFromAPI = async (globalFilters: GlobalFilters):
 /**
  * Create lifecycle stage for orders data
  */
-function createOrdersLifecycleStage(ordersData: OrdersBucketSummary): LifecycleStage {
+function createOrdersLifecycleStage(
+  ordersData?: OrdersBucketSummary | null,
+  error?: string | null
+): LifecycleStage {
+  const counts: OrdersBucketSummary = {
+    SERVICEABLE: ordersData?.SERVICEABLE ?? 0,
+    UNSERVICEABLE: ordersData?.UNSERVICEABLE ?? 0,
+    PROCESSING: ordersData?.PROCESSING ?? 0,
+    BOOKED: ordersData?.BOOKED ?? 0,
+    FAILED: ordersData?.FAILED ?? 0,
+    CANCELLED: ordersData?.CANCELLED ?? 0,
+  }
+
   const metrics: MetricData[] = []
   const exceptions: MetricData[] = []
 
   // Calculate total orders
-  const totalOrders = Object.values(ordersData).reduce((sum, count) => sum + count, 0)
+  const totalOrders = Object.values(counts).reduce((sum, count) => sum + count, 0)
 
   // Add main count metric
   metrics.push({
@@ -421,73 +455,79 @@ function createOrdersLifecycleStage(ordersData: OrdersBucketSummary): LifecycleS
   })
 
   // Add metrics for different order statuses
-  if (ordersData.SERVICEABLE > 0) {
+  if (counts.SERVICEABLE > 0) {
     metrics.push({
       metricId: 'orders-serviceable',
       label: 'Serviceable',
-      count: ordersData.SERVICEABLE,
+      count: counts.SERVICEABLE,
       statusType: 'positive',
       target: { path: '/orders', defaultFilters: { status: 'serviceable' } }
     })
   }
 
-  if (ordersData.PROCESSING > 0) {
+  if (counts.PROCESSING > 0) {
     metrics.push({
       metricId: 'orders-processing',
       label: 'Processing',
-      count: ordersData.PROCESSING,
+      count: counts.PROCESSING,
       statusType: 'warning',
       target: { path: '/orders', defaultFilters: { status: 'processing' } }
     })
   }
 
-  if (ordersData.BOOKED > 0) {
+  if (counts.BOOKED > 0) {
     metrics.push({
       metricId: 'orders-booked',
       label: 'Ready to Ship',
-      count: ordersData.BOOKED,
+      count: counts.BOOKED,
       statusType: 'positive',
       target: { path: '/orders', defaultFilters: { status: 'booked' } }
     })
   }
 
   // Add problematic statuses as exceptions
-  if (ordersData.UNSERVICEABLE > 0) {
+  if (counts.UNSERVICEABLE > 0) {
     exceptions.push({
       metricId: 'orders-unserviceable',
       label: 'Unserviceable',
-      count: ordersData.UNSERVICEABLE,
+      count: counts.UNSERVICEABLE,
       statusType: 'critical',
       target: { path: '/orders', defaultFilters: { status: 'unserviceable' } }
     })
   }
 
-  if (ordersData.FAILED > 0) {
+  if (counts.FAILED > 0) {
     exceptions.push({
       metricId: 'orders-failed',
       label: 'Failed',
-      count: ordersData.FAILED,
+      count: counts.FAILED,
       statusType: 'critical',
       target: { path: '/orders', defaultFilters: { status: 'failed' } }
     })
   }
 
-  if (ordersData.CANCELLED > 0) {
+  if (counts.CANCELLED > 0) {
     exceptions.push({
       metricId: 'orders-cancelled',
       label: 'Cancelled',
-      count: ordersData.CANCELLED,
+      count: counts.CANCELLED,
       statusType: 'critical',
       target: { path: '/orders', defaultFilters: { status: 'cancelled' } }
     })
   }
 
-  return {
+  const stage: LifecycleStage = {
     id: 'orders',
     title: 'Orders',
     metrics,
     exceptions: exceptions.length > 0 ? exceptions : undefined
   }
+
+  if (error) {
+    stage.error = error
+  }
+
+  return stage
 }
 
 /**
@@ -497,6 +537,7 @@ function transformShipmentDataToTabData(
   apiResponse: ShipmentSummaryApiResponse,
   analyticsMap?: Map<string, ShipmentSpecificBucketSummary | null>,
   ordersData?: OrdersBucketSummary | null,
+  ordersError?: string | null,
   globalFilters?: GlobalFilters
 ): TabData {
   const milestoneData = apiResponse.data.milestone_summary
@@ -764,12 +805,9 @@ function transformShipmentDataToTabData(
     }
   )
 
-  // Create Orders lifecycle stage if orders data is available
   const finalLifecycleStages: LifecycleStage[] = []
-  if (ordersData) {
-    const ordersStage = createOrdersLifecycleStage(ordersData)
-    finalLifecycleStages.push(ordersStage)
-  }
+  const ordersStage = createOrdersLifecycleStage(ordersData, ordersError)
+  finalLifecycleStages.push(ordersStage)
   finalLifecycleStages.push(...lifecycleStages)
 
   return {

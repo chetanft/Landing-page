@@ -14,13 +14,13 @@ import {
   SegmentedTabItem,
   Divider,
   Alert,
-  Icon
+  Icon,
+  Logo
 } from 'ft-design-system'
 import { useAuth } from '../auth/AuthContext'
 import type { LoginCredentials } from '../auth/AuthContext'
 
-// Figma assets
-const imgHeader = 'https://www.figma.com/api/mcp/asset/1721e91c-eba0-498d-a476-145b10b7b71a'
+// Assets
 const imgGoogleIcon = 'https://www.figma.com/api/mcp/asset/13062fc2-c406-4ddd-8549-63779e808e07'
 const imgMicrosoftLogo = 'https://www.figma.com/api/mcp/asset/04ddcc59-4e7d-4aa6-b48e-228144fdee86'
 const imgImage5 = 'https://www.figma.com/api/mcp/asset/6ba08004-7545-4ac5-b376-0d7edaf671f7'
@@ -188,12 +188,8 @@ export default function LoginPage() {
         {/* Top Content */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
           {/* Logo */}
-          <div style={{ height: '45px', width: '237px' }}>
-            <img 
-              src={imgHeader} 
-              alt="Freight Tiger" 
-              style={{ height: '100%', width: '100%', objectFit: 'contain' }}
-            />
+          <div style={{ height: '45px', width: '237px', display: 'flex', alignItems: 'center' }}>
+            <Logo name="ft" style={{ height: '100%', width: '100%', objectFit: 'contain' }} />
           </div>
 
           {/* Login Section */}

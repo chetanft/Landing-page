@@ -269,10 +269,12 @@ function HeaderRow({
 // Milestones Row - Grid row with consistent alignment
 function MilestonesRow({
   stages,
-  globalFilters
+  globalFilters,
+  onRetry
 }: {
   stages: LifecycleStage[]
   globalFilters: GlobalFilters
+  onRetry: () => void
 }) {
   return (
     <div style={{ display: 'flex', borderBottom: thinBorder, alignItems: 'stretch' }}>
@@ -280,6 +282,7 @@ function MilestonesRow({
         const groups = groupMetrics(stage.metrics)
         const hasGroups = groups.length > 0
         const isGrouped = groups.length > 1 || (groups.length === 1 && groups[0].groupLabel !== null)
+        const hasError = Boolean(stage.error)
 
         return (
           <div
@@ -306,7 +309,24 @@ function MilestonesRow({
               MILESTONE
             </Typography>
 
-            {hasGroups ? (
+            {hasError ? (
+              <div style={{
+                padding: 'var(--spacing-x3)',
+                borderRadius: 'var(--radius-md)',
+                border: thinBorder,
+                backgroundColor: 'var(--bg-secondary)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--spacing-x2)'
+              }}>
+                <Typography variant="body-secondary-regular" color="tertiary" style={{ fontSize: 'var(--font-size-sm)' }}>
+                  {stage.error}
+                </Typography>
+                <Button variant="text" size="sm" onClick={onRetry} style={{ alignSelf: 'flex-start' }}>
+                  Retry
+                </Button>
+              </div>
+            ) : hasGroups ? (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {groups.map((group, groupIdx) => (
                   <div key={group.groupKey} style={{ display: 'flex', flexDirection: 'column' }}>
@@ -571,6 +591,7 @@ export default function NewLifecycleBoard({
           <MilestonesRow
             stages={lifecycleStages}
             globalFilters={globalFilters}
+            onRetry={onRetry}
           />
         )}
         <SectionToggle
