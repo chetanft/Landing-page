@@ -152,6 +152,14 @@ div.font-sans.text-lg-rem.font-semibold {
   font-weight: 600 !important;
 }
 
+/* Typography display-primary variant font-size override for LoginPage */
+/* Targets Typography components with display-primary variant that have font-size: 16px in inline style */
+/* Overrides the 32px rule above to allow 16px font size */
+/* React converts fontSize to font-size in the DOM, so we match font-size: 16px */
+div.font-sans.text-lg-rem.font-semibold[style*="font-size: 16px"] {
+  font-size: 16px !important;
+}
+
 /* Typography body-primary-regular date/time color override */
 /* Targets Typography components with body-primary-regular variant displaying dates/times */
 /* Changes color from var(--text-primary) to var(--text-secondary) */

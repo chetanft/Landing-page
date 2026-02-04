@@ -202,7 +202,7 @@ export default function LoginPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <Typography variant="display-primary" style={{ 
               color: 'var(--primary)',
-              fontSize: '20px',
+              fontSize: '16px',
               fontWeight: 600,
               lineHeight: 1.4
             }}>
