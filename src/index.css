@@ -144,10 +144,12 @@ h1.font-sans.font-normal {
 /* Typography display-primary variant color override */
 /* Targets Typography components with display-primary variant and color="primary" */
 /* Changes color from rgb(67, 79, 100) to var(--primary) */
-/* Changes font-size from 20.006px to 16px */
+/* Changes font-size from 24px to 32px */
+/* Changes font-weight to 600 */
 div.font-sans.text-lg-rem.font-semibold {
   color: var(--primary) !important;
-  font-size: 16px !important;
+  font-size: 32px !important;
+  font-weight: 600 !important;
 }
 
 /* Typography body-primary-regular date/time color override */

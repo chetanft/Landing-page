@@ -20,10 +20,16 @@ import {
 import { useAuth } from '../auth/AuthContext'
 import type { LoginCredentials } from '../auth/AuthContext'
 
-// Assets
-const imgGoogleIcon = 'https://www.figma.com/api/mcp/asset/13062fc2-c406-4ddd-8549-63779e808e07'
-const imgMicrosoftLogo = 'https://www.figma.com/api/mcp/asset/04ddcc59-4e7d-4aa6-b48e-228144fdee86'
-const imgImage5 = 'https://www.figma.com/api/mcp/asset/6ba08004-7545-4ac5-b376-0d7edaf671f7'
+// Assets - Using local assets from public/assets folder
+// Note: Figma MCP asset URLs expire and are not publicly accessible
+// Assets have been downloaded from Figma and saved to public/assets/
+// Original Figma asset IDs for reference:
+// - Google icon: 13062fc2-c406-4ddd-8549-63779e808e07
+// - Microsoft logo: 04ddcc59-4e7d-4aa6-b48e-228144fdee86
+// - Product showcase: 6ba08004-7545-4ac5-b376-0d7edaf671f7
+const imgGoogleIcon = '/assets/google-icon.png'
+const imgMicrosoftLogo = '/assets/microsoft-logo.png'
+const imgImage5 = '/assets/product-showcase.png' // Main product image for slides
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -402,7 +408,16 @@ export default function LoginPage() {
                   console.log('Google sign in clicked')
                 }}
               >
-                <img src={imgGoogleIcon} alt="Google" style={{ width: '20px', height: '20px' }} />
+                <img 
+                  src={imgGoogleIcon} 
+                  alt="Google" 
+                  style={{ width: '20px', height: '20px' }}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement
+                    target.style.display = 'none'
+                    console.warn(`Failed to load Google icon: ${imgGoogleIcon}`)
+                  }}
+                />
                 <span style={{ 
                   color: 'var(--primary)',
                   fontSize: '16px',
@@ -431,7 +446,16 @@ export default function LoginPage() {
                   console.log('Microsoft sign in clicked')
                 }}
               >
-                <img src={imgMicrosoftLogo} alt="Microsoft" style={{ width: '20px', height: '20px' }} />
+                <img 
+                  src={imgMicrosoftLogo} 
+                  alt="Microsoft" 
+                  style={{ width: '20px', height: '20px' }}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement
+                    target.style.display = 'none'
+                    console.warn(`Failed to load Microsoft logo: ${imgMicrosoftLogo}`)
+                  }}
+                />
                 <span style={{ 
                   color: 'var(--primary)',
                   fontSize: '16px',
@@ -612,6 +636,13 @@ export default function LoginPage() {
                       height: '100%',
                       objectFit: 'cover',
                       objectPosition: 'top left'
+                    }}
+                    onError={(e) => {
+                      // Fallback to a placeholder if image fails to load
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                      // You can add a placeholder div here if needed
+                      console.warn(`Failed to load image: ${slide.image}`)
                     }}
                   />
                 </div>

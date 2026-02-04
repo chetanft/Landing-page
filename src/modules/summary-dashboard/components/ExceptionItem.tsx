@@ -10,6 +10,7 @@ interface ExceptionItemProps {
 
 export default function ExceptionItem({ metric, globalFilters }: ExceptionItemProps) {
   const navigate = useNavigate()
+  const displayCount = metric.isMissing ? '-' : metric.count.toLocaleString()
 
   const handleClick = () => {
     const url = buildTargetUrl(metric.target, globalFilters)
@@ -23,7 +24,9 @@ export default function ExceptionItem({ metric, globalFilters }: ExceptionItemPr
     }
   }
 
-  const tooltipText = `${metric.label}: Click to view ${metric.count.toLocaleString()} items`
+  const tooltipText = metric.isMissing
+    ? `${metric.label}: No data available`
+    : `${metric.label}: Click to view ${metric.count.toLocaleString()} items`
 
   return (
     <div
@@ -40,7 +43,7 @@ export default function ExceptionItem({ metric, globalFilters }: ExceptionItemPr
       role="button"
       tabIndex={0}
       title={tooltipText}
-      aria-label={`${metric.label}: ${metric.count}. Click to view details.`}
+      aria-label={`${metric.label}: ${metric.isMissing ? 'No data available' : metric.count}. Click to view details.`}
       onMouseEnter={(e) => {
         e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'
       }}
@@ -59,7 +62,7 @@ export default function ExceptionItem({ metric, globalFilters }: ExceptionItemPr
         variant="body-primary-semibold"
         style={{ color: 'var(--critical)', fontSize: 'var(--font-size-md)' }}
       >
-        {metric.count.toLocaleString()}
+        {displayCount}
       </Typography>
       <Typography variant="body-secondary-regular" color="secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
         {metric.label}

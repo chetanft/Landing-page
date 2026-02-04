@@ -27,6 +27,7 @@ export interface MetricData {
   target: MetricTarget
   isLoading?: boolean
   error?: string | null
+  isMissing?: boolean
   groupKey?: string
   groupLabel?: string
   groupOrder?: number

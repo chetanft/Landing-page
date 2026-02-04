@@ -34,11 +34,8 @@ interface MetricGroup {
 }
 
 function groupMetrics(metrics: any[]): MetricGroup[] {
-  // Filter out metrics with count = 0
-  // Also filter out summary metrics (groupKey === 'summary') as they're redundant with the header
-  const nonZeroMetrics = metrics.filter(m => 
-    m.count > 0 && m.groupKey !== 'summary'
-  )
+  // Filter out summary metrics (groupKey === 'summary') as they're redundant with the header
+  const nonZeroMetrics = metrics.filter(m => m.groupKey !== 'summary')
   
   if (nonZeroMetrics.length === 0) {
     return []
@@ -209,6 +206,7 @@ function HeaderRow({
           stage.metrics.find(m => m.label === 'Total')?.count ??
           // Last fallback: sum only non-grouped metrics (shouldn't happen in normal flow)
           stage.metrics.filter(m => !m.groupKey || m.groupKey === 'summary').reduce((sum, m) => sum + m.count, 0)
+        const totalDisplay = summaryMetric?.isMissing ? '-' : totalCount.toLocaleString()
         const description = getStageDescription(stage.title)
 
         return (
@@ -255,9 +253,9 @@ function HeaderRow({
               </Tooltip>
             </div>
             <Typography variant="display-primary" color="primary" style={{
-              fontSize: 'var(--font-size-xl)'
+              fontSize: '32px'
             }}>
-              {totalCount.toLocaleString()}
+              {totalDisplay}
             </Typography>
           </div>
         )
@@ -355,15 +353,31 @@ function MilestonesRow({
 
                     {/* Progress items within this group */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                      {group.items.map((metric, itemIdx) => (
-                        <ProgressItem
-                          key={metric.metricId}
-                          metric={metric}
-                          globalFilters={globalFilters}
-                          isFirst={itemIdx === 0}
-                          isLast={itemIdx === group.items.length - 1}
-                        />
-                      ))}
+                      {group.items.map((metric, itemIdx) => {
+                        // Render StatusItem for At Drop / At Pickup / At Drop + Pickup metrics
+                        const isStatusItemMetric = ['in-transit-at-drop', 'in-transit-at-pickup', 'in-transit-at-drop-pickup'].includes(metric.metricId)
+                        
+                        if (isStatusItemMetric) {
+                          return (
+                            <div key={metric.metricId} style={{ padding: 'var(--spacing-x2) 0' }}>
+                              <StatusItem
+                                metric={metric}
+                                globalFilters={globalFilters}
+                              />
+                            </div>
+                          )
+                        }
+                        
+                        return (
+                          <ProgressItem
+                            key={metric.metricId}
+                            metric={metric}
+                            globalFilters={globalFilters}
+                            isFirst={itemIdx === 0}
+                            isLast={itemIdx === group.items.length - 1}
+                          />
+                        )
+                      })}
                     </div>
                   </div>
                 ))}
@@ -377,7 +391,7 @@ function MilestonesRow({
                 height: '100%',
                 fontStyle: 'italic'
               }}>
-                —
+                -
               </Typography>
             )}
           </div>
@@ -441,7 +455,7 @@ function ExceptionsRow({
               height: '100%',
               fontStyle: 'italic'
             }}>
-              No exceptions
+              -
             </Typography>
           )}
         </div>
@@ -504,7 +518,7 @@ function StatusRow({
               height: '100%',
               fontStyle: 'italic'
             }}>
-              No status
+              -
             </Typography>
           )}
         </div>

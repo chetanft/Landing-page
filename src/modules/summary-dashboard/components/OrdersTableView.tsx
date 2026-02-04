@@ -1,13 +1,12 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Button, Badge, Typography, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from 'ft-design-system'
 import { useOrdersTableData } from '../hooks/useOrdersTableData'
 import { getCustomDataTemplate } from '../data/ordersApiService'
 import type { OrderRow, OrderStatus, CustomDataTemplateField } from '../types/orders'
 import type { GlobalFilters } from '../types/metrics'
 import ErrorBanner from './ErrorBanner'
-import EmptyState from './EmptyState'
 import TableSkeleton from './TableSkeleton'
-import { formatDateTime, formatDelay } from '../utils/ordersFormat'
+import { formatDateTime } from '../utils/ordersFormat'
 
 type FilterId = 'inbound' | 'outbound' | 'ftl' | 'ptl' | 'delivery-delayed'
 
@@ -49,7 +48,7 @@ export default function OrdersTableView({
   // Format custom field value for display
   const formatCustomValue = (value: any, field: CustomDataTemplateField): string => {
     if (value === null || value === undefined || value === '') {
-      return '—'
+      return '-'
     }
     if (field.type === 'number') {
       return String(Number(value))
@@ -89,40 +88,19 @@ export default function OrdersTableView({
     return <ErrorBanner error={error} onRetry={refetch} />
   }
 
-  // Determine if filters are applied
-  const hasFilters = useMemo(() => {
-    return (
-      selectedFilters.size > 0 ||
-      selectedOutboundOption !== null ||
-      globalFilters.locationId !== undefined ||
-      globalFilters.transporterId !== undefined ||
-      globalFilters.priority !== undefined ||
-      globalFilters.dateRange !== undefined
-    )
-  }, [selectedFilters, selectedOutboundOption, globalFilters])
-
-  // Show empty state if no orders
-  if (orders.length === 0) {
-    const emptyVariant = hasFilters ? 'no-results' : 'no-data'
-    return (
-      <EmptyState
-        variant={emptyVariant}
-        onAction={hasFilters ? () => {
-          // Clear filters - this would need to be passed as a prop or handled by parent
-          // For now, just show the empty state
-        } : undefined}
-        actionLabel={hasFilters ? 'Clear filters' : undefined}
-      />
-    )
+  const getCellValue = (value: string | number | null | undefined): string => {
+    if (value === null || value === undefined || value === '') return '-'
+    return String(value)
   }
 
+  const showNoData = orders.length === 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-x4)', width: '100%' }}>
       {/* Header Section */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 'var(--spacing-x2)' }}>
         <Typography variant="body-primary-semibold" style={{ fontSize: 'var(--font-size-md)', color: 'var(--primary)' }}>
-          {orders.length} Orders available
+          {showNoData ? 'No data available' : `${orders.length} Orders available`}
         </Typography>
       </div>
 
@@ -202,7 +180,16 @@ export default function OrdersTableView({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {orders.map((row: OrderRow) => (
+            {showNoData ? (
+              <TableRow>
+                <TableCell colSpan={totalColumnCount}>
+                  <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
+                    No data available
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              orders.map((row: OrderRow) => (
                 <TableRow
                   key={row.id}
                   onMouseEnter={(e) => {
@@ -221,43 +208,49 @@ export default function OrdersTableView({
                 >
                   <TableCell>
                     <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)' }}>
-                      {row.orderId}
+                      {getCellValue(row.orderId)}
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)' }}>
-                      {row.consignorName}
+                      {getCellValue(row.consignorName)}
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)' }}>
-                      {row.consigneeName}
+                      {getCellValue(row.consigneeName)}
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)' }}>
-                      {row.route}
+                      {getCellValue(row.route)}
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)' }}>
-                      {row.tripType}
+                      {getCellValue(row.tripType)}
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)' }}>
-                      {row.stage}
+                      {getCellValue(row.stage)}
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)' }}>
-                      {row.milestone || '—'}
+                      {getCellValue(row.milestone)}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={getStatusBadgeVariant(row.status)} size="sm">
-                      {row.status}
-                    </Badge>
+                    {row.status ? (
+                      <Badge variant={getStatusBadgeVariant(row.status)} size="sm">
+                        {row.status}
+                      </Badge>
+                    ) : (
+                      <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
+                        -
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Typography
@@ -269,7 +262,7 @@ export default function OrdersTableView({
                         textDecoration: 'none'
                       }}
                     >
-                      {row.relatedIdType}: {row.relatedId}
+                      {row.relatedIdType && row.relatedId ? `${row.relatedIdType}: ${row.relatedId}` : '-'}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -283,12 +276,16 @@ export default function OrdersTableView({
                             ? `Delayed by ${row.delayDays} ${row.delayDays === 1 ? 'day' : 'days'}`
                             : 'Delayed'}
                         </Typography>
-                      ) : (
+                      ) : row.deliveryStatus ? (
                         <Typography
                           variant="body-primary-regular"
                           style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)' }}
                         >
                           On time
+                        </Typography>
+                      ) : (
+                        <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
+                          -
                         </Typography>
                       )}
                       {row.deliveryEta && (
@@ -300,7 +297,7 @@ export default function OrdersTableView({
                   </TableCell>
                   <TableCell>
                     <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)' }}>
-                      {row.dispatchDate ? formatDateTime(row.dispatchDate) : '—'}
+                      {row.dispatchDate ? formatDateTime(row.dispatchDate) : '-'}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -333,7 +330,7 @@ export default function OrdersTableView({
                   })}
                 </TableRow>
               ))
-            }
+            )}
           </TableBody>
         </Table>
       </div>

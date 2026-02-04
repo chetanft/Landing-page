@@ -28,6 +28,7 @@ export default function NewLifecycleColumn({ stage, icon, globalFilters, section
     (stage.id === 'indents'
       ? stage.metrics.filter(metric => !metric.label.startsWith('  ')).reduce((sum, m) => sum + m.count, 0)
       : stage.metrics.reduce((sum, m) => sum + m.count, 0))
+  const totalDisplay = summaryMetric?.isMissing ? '-' : totalCount.toLocaleString()
   const orderedMetrics = stage.id === 'planning'
     ? displayableMetrics
       .map((metric, index) => ({
@@ -59,7 +60,7 @@ export default function NewLifecycleColumn({ stage, icon, globalFilters, section
           <Icon name="info" size={14} style={{ color: 'var(--text-tertiary)' }} />
         </div>
         <Typography variant="display-primary" color="primary" style={{ fontSize: 'var(--font-size-xxl)' }}>
-          {totalCount}
+          {totalDisplay}
         </Typography>
       </div>
 
@@ -77,15 +78,31 @@ export default function NewLifecycleColumn({ stage, icon, globalFilters, section
             </Typography>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', marginTop: 'var(--spacing-x2)' }}>
-            {orderedMetrics.map((metric, index) => (
-              <ProgressItem
-                key={metric.metricId}
-                metric={metric}
-                globalFilters={globalFilters}
-                isFirst={index === 0}
-                isLast={index === orderedMetrics.length - 1}
-              />
-            ))}
+            {orderedMetrics.map((metric, index) => {
+              // Render StatusItem for At Drop / At Pickup / At Drop + Pickup metrics
+              const isStatusItemMetric = ['in-transit-at-drop', 'in-transit-at-pickup', 'in-transit-at-drop-pickup'].includes(metric.metricId)
+              
+              if (isStatusItemMetric) {
+                return (
+                  <div key={metric.metricId} style={{ padding: 'var(--spacing-x2) 0' }}>
+                    <StatusItem
+                      metric={metric}
+                      globalFilters={globalFilters}
+                    />
+                  </div>
+                )
+              }
+              
+              return (
+                <ProgressItem
+                  key={metric.metricId}
+                  metric={metric}
+                  globalFilters={globalFilters}
+                  isFirst={index === 0}
+                  isLast={index === orderedMetrics.length - 1}
+                />
+              )
+            })}
           </div>
         </div>
       </div>

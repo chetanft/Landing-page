@@ -130,156 +130,161 @@ const buildRealOrdersLifecycleStages = async (
     }
 
     const bucketSummary = await bucketSummaryPromise
-    const getCount = (value?: number) => (typeof value === 'number' ? value : 0)
+    const getCountInfo = (value?: number) => ({
+      count: typeof value === 'number' ? value : 0,
+      isMissing: typeof value !== 'number'
+    })
 
     if (import.meta.env.DEV && bucketSummary) {
       console.log('[buildRealOrdersLifecycleStages] Bucket summary:', bucketSummary)
     }
 
     // Helper to get bucket count
-    const getBucketCount = (bucketName: string): number => {
-      return bucketSummary?.[bucketName] ?? 0
+    const getBucketInfo = (bucketName: string): { count: number; isMissing: boolean } => {
+      if (!bucketSummary) {
+        return { count: 0, isMissing: true }
+      }
+      const value = bucketSummary[bucketName as keyof typeof bucketSummary]
+      return { count: typeof value === 'number' ? value : 0, isMissing: typeof value !== 'number' }
     }
 
     // Build planning metrics with bucket data
     const planningMetrics: MetricData[] = []
     
     // Add bucket-based metrics first
-    if (getBucketCount('SERVICEABLE') > 0 || getBucketCount('UNSERVICEABLE') > 0 || getBucketCount('PROCESSING') > 0) {
-      if (getBucketCount('SERVICEABLE') > 0) {
-        planningMetrics.push({
-          metricId: 'orders.planning.serviceable',
-          label: 'Serviceable',
-          count: getBucketCount('SERVICEABLE'),
-          statusType: 'positive',
-          target: { path: '/tms/orders', defaultFilters: { bucket: ['SERVICEABLE'] } },
-        })
-      }
-      
-      if (getBucketCount('UNSERVICEABLE') > 0) {
-        planningMetrics.push({
-          metricId: 'orders.planning.unserviceable',
-          label: 'Unserviceable',
-          count: getBucketCount('UNSERVICEABLE'),
-          statusType: 'warning',
-          target: { path: '/tms/orders', defaultFilters: { bucket: ['UNSERVICEABLE'] } },
-        })
-      }
-      
-      if (getBucketCount('PROCESSING') > 0) {
-        planningMetrics.push({
-          metricId: 'orders.planning.processing',
-          label: 'Processing',
-          count: getBucketCount('PROCESSING'),
-          statusType: 'neutral',
-          target: { path: '/tms/orders', defaultFilters: { bucket: ['PROCESSING'] } },
-        })
-      }
-    }
+    const serviceableInfo = getBucketInfo('SERVICEABLE')
+    planningMetrics.push({
+      metricId: 'orders.planning.serviceable',
+      label: 'Serviceable',
+      count: serviceableInfo.count,
+      statusType: 'positive',
+      target: { path: '/tms/orders', defaultFilters: { bucket: ['SERVICEABLE'] } },
+      isMissing: serviceableInfo.isMissing
+    })
+
+    const unserviceableInfo = getBucketInfo('UNSERVICEABLE')
+    planningMetrics.push({
+      metricId: 'orders.planning.unserviceable',
+      label: 'Unserviceable',
+      count: unserviceableInfo.count,
+      statusType: 'warning',
+      target: { path: '/tms/orders', defaultFilters: { bucket: ['UNSERVICEABLE'] } },
+      isMissing: unserviceableInfo.isMissing
+    })
+
+    const processingInfo = getBucketInfo('PROCESSING')
+    planningMetrics.push({
+      metricId: 'orders.planning.processing',
+      label: 'Processing',
+      count: processingInfo.count,
+      statusType: 'neutral',
+      target: { path: '/tms/orders', defaultFilters: { bucket: ['PROCESSING'] } },
+      isMissing: processingInfo.isMissing
+    })
     
     // Add traditional status-based metrics
-    if (getCount(counts.UNPLANNED) > 0) {
-      planningMetrics.push({
-        metricId: 'orders.planning.unplanned',
-        label: 'Unplanned',
-        count: getCount(counts.UNPLANNED),
-        statusType: 'warning',
-        target: { path: '/tms/orders', defaultFilters: { status: ['UNPLANNED'] } },
-      })
-    }
+    const unplannedInfo = getCountInfo(counts.UNPLANNED)
+    planningMetrics.push({
+      metricId: 'orders.planning.unplanned',
+      label: 'Unplanned',
+      count: unplannedInfo.count,
+      statusType: 'warning',
+      target: { path: '/tms/orders', defaultFilters: { status: ['UNPLANNED'] } },
+      isMissing: unplannedInfo.isMissing
+    })
     
-    if (getCount(counts.PLANNED) > 0) {
-      planningMetrics.push({
-        metricId: 'orders.planning.planned',
-        label: 'Planned',
-        count: getCount(counts.PLANNED),
-        statusType: 'positive',
-        target: { path: '/tms/orders', defaultFilters: { status: ['PLANNED'] } },
-      })
-    }
+    const plannedInfo = getCountInfo(counts.PLANNED)
+    planningMetrics.push({
+      metricId: 'orders.planning.planned',
+      label: 'Planned',
+      count: plannedInfo.count,
+      statusType: 'positive',
+      target: { path: '/tms/orders', defaultFilters: { status: ['PLANNED'] } },
+      isMissing: plannedInfo.isMissing
+    })
     
-    if (getCount(counts.PARTIALLY_PLANNED) > 0) {
-      planningMetrics.push({
-        metricId: 'orders.planning.partially_planned',
-        label: 'Partially Planned',
-        count: getCount(counts.PARTIALLY_PLANNED),
-        statusType: 'warning',
-        target: { path: '/tms/orders', defaultFilters: { status: ['PARTIALLY_PLANNED'] } },
-      })
-    }
+    const partiallyPlannedInfo = getCountInfo(counts.PARTIALLY_PLANNED)
+    planningMetrics.push({
+      metricId: 'orders.planning.partially_planned',
+      label: 'Partially Planned',
+      count: partiallyPlannedInfo.count,
+      statusType: 'warning',
+      target: { path: '/tms/orders', defaultFilters: { status: ['PARTIALLY_PLANNED'] } },
+      isMissing: partiallyPlannedInfo.isMissing
+    })
     
-    if (getCount(counts.VALIDATION_IN_PROGRESS) > 0) {
-      planningMetrics.push({
-        metricId: 'orders.planning.validation_in_progress',
-        label: 'Validation In Progress',
-        count: getCount(counts.VALIDATION_IN_PROGRESS),
-        statusType: 'neutral',
-        target: { path: '/tms/orders', defaultFilters: { status: ['VALIDATION_IN_PROGRESS'] } },
-      })
-    }
+    const validationInProgressInfo = getCountInfo(counts.VALIDATION_IN_PROGRESS)
+    planningMetrics.push({
+      metricId: 'orders.planning.validation_in_progress',
+      label: 'Validation In Progress',
+      count: validationInProgressInfo.count,
+      statusType: 'neutral',
+      target: { path: '/tms/orders', defaultFilters: { status: ['VALIDATION_IN_PROGRESS'] } },
+      isMissing: validationInProgressInfo.isMissing
+    })
     
-    if (getCount(counts.VALIDATION_SUCCESS) > 0) {
-      planningMetrics.push({
-        metricId: 'orders.planning.validation_success',
-        label: 'Validation Success',
-        count: getCount(counts.VALIDATION_SUCCESS),
-        statusType: 'positive',
-        target: { path: '/tms/orders', defaultFilters: { status: ['VALIDATION_SUCCESS'] } },
-      })
-    }
+    const validationSuccessInfo = getCountInfo(counts.VALIDATION_SUCCESS)
+    planningMetrics.push({
+      metricId: 'orders.planning.validation_success',
+      label: 'Validation Success',
+      count: validationSuccessInfo.count,
+      statusType: 'positive',
+      target: { path: '/tms/orders', defaultFilters: { status: ['VALIDATION_SUCCESS'] } },
+      isMissing: validationSuccessInfo.isMissing
+    })
     
-    if (getCount(counts.VALIDATION_FAILURE) > 0) {
-      planningMetrics.push({
-        metricId: 'orders.planning.validation_failure',
-        label: 'Validation Failure',
-        count: getCount(counts.VALIDATION_FAILURE),
-        statusType: 'warning',
-        target: { path: '/tms/orders', defaultFilters: { status: ['VALIDATION_FAILURE'] } },
-      })
-    }
+    const validationFailureInfo = getCountInfo(counts.VALIDATION_FAILURE)
+    planningMetrics.push({
+      metricId: 'orders.planning.validation_failure',
+      label: 'Validation Failure',
+      count: validationFailureInfo.count,
+      statusType: 'warning',
+      target: { path: '/tms/orders', defaultFilters: { status: ['VALIDATION_FAILURE'] } },
+      isMissing: validationFailureInfo.isMissing
+    })
     
-    if (getCount(counts.PLANNING_CORE_FAILED) > 0) {
-      planningMetrics.push({
-        metricId: 'orders.planning.core_failed',
-        label: 'Planning Core Failed',
-        count: getCount(counts.PLANNING_CORE_FAILED),
-        statusType: 'critical',
-        target: { path: '/tms/orders', defaultFilters: { status: ['PLANNING_CORE_FAILED'] } },
-      })
-    }
+    const planningCoreFailedInfo = getCountInfo(counts.PLANNING_CORE_FAILED)
+    planningMetrics.push({
+      metricId: 'orders.planning.core_failed',
+      label: 'Planning Core Failed',
+      count: planningCoreFailedInfo.count,
+      statusType: 'critical',
+      target: { path: '/tms/orders', defaultFilters: { status: ['PLANNING_CORE_FAILED'] } },
+      isMissing: planningCoreFailedInfo.isMissing
+    })
 
     // Build in-execution metrics with bucket data
     const inExecutionMetrics: MetricData[] = []
     
-    if (getBucketCount('BOOKED') > 0) {
-      inExecutionMetrics.push({
-        metricId: 'orders.in_execution.booked',
-        label: 'Booked',
-        count: getBucketCount('BOOKED'),
-        statusType: 'neutral',
-        target: { path: '/tms/orders', defaultFilters: { bucket: ['BOOKED'] } },
-      })
-    }
+    const bookedInfo = getBucketInfo('BOOKED')
+    inExecutionMetrics.push({
+      metricId: 'orders.in_execution.booked',
+      label: 'Booked',
+      count: bookedInfo.count,
+      statusType: 'neutral',
+      target: { path: '/tms/orders', defaultFilters: { bucket: ['BOOKED'] } },
+      isMissing: bookedInfo.isMissing
+    })
     
-    if (getCount(counts.IN_PROGRESS) > 0) {
-      inExecutionMetrics.push({
-        metricId: 'orders.in_execution.in_progress',
-        label: 'In Progress',
-        count: getCount(counts.IN_PROGRESS),
-        statusType: 'neutral',
-        target: { path: '/tms/orders', defaultFilters: { status: ['IN_PROGRESS'] } },
-      })
-    }
+    const inProgressInfo = getCountInfo(counts.IN_PROGRESS)
+    inExecutionMetrics.push({
+      metricId: 'orders.in_execution.in_progress',
+      label: 'In Progress',
+      count: inProgressInfo.count,
+      statusType: 'neutral',
+      target: { path: '/tms/orders', defaultFilters: { status: ['IN_PROGRESS'] } },
+      isMissing: inProgressInfo.isMissing
+    })
     
-    if (getCount(counts.DISPATCHED) > 0) {
-      inExecutionMetrics.push({
-        metricId: 'orders.in_execution.dispatched',
-        label: 'Dispatched',
-        count: getCount(counts.DISPATCHED),
-        statusType: 'neutral',
-        target: { path: '/tms/orders', defaultFilters: { status: ['DISPATCHED'] } },
-      })
-    }
+    const dispatchedInfo = getCountInfo(counts.DISPATCHED)
+    inExecutionMetrics.push({
+      metricId: 'orders.in_execution.dispatched',
+      label: 'Dispatched',
+      count: dispatchedInfo.count,
+      statusType: 'neutral',
+      target: { path: '/tms/orders', defaultFilters: { status: ['DISPATCHED'] } },
+      isMissing: dispatchedInfo.isMissing
+    })
 
     return [
       // Planning Column
@@ -304,16 +309,18 @@ const buildRealOrdersLifecycleStages = async (
           {
             metricId: 'orders.delivered.delivered',
             label: 'Delivered',
-            count: getCount(counts.DELIVERED),
+            count: getCountInfo(counts.DELIVERED).count,
             statusType: 'positive',
             target: { path: '/tms/orders', defaultFilters: { status: ['DELIVERED'] } },
+            isMissing: getCountInfo(counts.DELIVERED).isMissing
           },
           {
             metricId: 'orders.delivered.partially_delivered',
             label: 'Partially Delivered',
-            count: getCount(counts.PARTIALLY_DELIVERED),
+            count: getCountInfo(counts.PARTIALLY_DELIVERED).count,
             statusType: 'warning',
             target: { path: '/tms/orders', defaultFilters: { status: ['PARTIALLY_DELIVERED'] } },
+            isMissing: getCountInfo(counts.PARTIALLY_DELIVERED).isMissing
           },
         ],
       },
@@ -326,9 +333,10 @@ const buildRealOrdersLifecycleStages = async (
           {
             metricId: 'orders.invoicing.ready_for_invoicing',
             label: 'Ready for Invoicing',
-            count: getCount(counts.DELIVERED) + getCount(counts.PARTIALLY_DELIVERED),
+            count: getCountInfo(counts.DELIVERED).count + getCountInfo(counts.PARTIALLY_DELIVERED).count,
             statusType: 'neutral',
             target: { path: '/tms/orders', defaultFilters: { status: ['DELIVERED', 'PARTIALLY_DELIVERED'] } },
+            isMissing: getCountInfo(counts.DELIVERED).isMissing && getCountInfo(counts.PARTIALLY_DELIVERED).isMissing
           },
         ],
       },
@@ -338,37 +346,41 @@ const buildRealOrdersLifecycleStages = async (
         id: 'failed',
         title: 'Failed',
         metrics: [
-          ...(getBucketCount('FAILED') > 0 ? [{
+          {
             metricId: 'orders.failed.failed_bucket',
             label: 'Failed',
-            count: getBucketCount('FAILED'),
+            count: getBucketInfo('FAILED').count,
             statusType: 'critical' as const,
             target: { path: '/tms/orders', defaultFilters: { bucket: ['FAILED'] } },
-          }] : []),
-          ...(getBucketCount('CANCELLED') > 0 ? [{
+            isMissing: getBucketInfo('FAILED').isMissing
+          },
+          {
             metricId: 'orders.failed.cancelled_bucket',
             label: 'Cancelled',
-            count: getBucketCount('CANCELLED'),
+            count: getBucketInfo('CANCELLED').count,
             statusType: 'critical' as const,
             target: { path: '/tms/orders', defaultFilters: { bucket: ['CANCELLED'] } },
-          }] : []),
-          ...(getCount(counts.FAILED) > 0 ? [{
+            isMissing: getBucketInfo('CANCELLED').isMissing
+          },
+          {
             metricId: 'orders.failed.failed',
             label: 'Failed (Status)',
-            count: getCount(counts.FAILED),
+            count: getCountInfo(counts.FAILED).count,
             statusType: 'critical' as const,
             target: { path: '/tms/orders', defaultFilters: { status: ['FAILED'] } },
-          }] : []),
+            isMissing: getCountInfo(counts.FAILED).isMissing
+          },
         ],
-        exceptions: getCount(counts.DELETED) > 0 ? [
+        exceptions: [
           {
             metricId: 'orders.failed.deleted',
             label: 'Deleted',
-            count: getCount(counts.DELETED),
+            count: getCountInfo(counts.DELETED).count,
             statusType: 'critical',
             target: { path: '/tms/orders', defaultFilters: { status: ['DELETED'] } },
+            isMissing: getCountInfo(counts.DELETED).isMissing
           },
-        ] : undefined,
+        ],
       },
     ]
   } catch (error) {

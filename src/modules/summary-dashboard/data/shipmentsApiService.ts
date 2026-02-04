@@ -438,6 +438,7 @@ function createOrdersLifecycleStage(
     FAILED: ordersData?.FAILED ?? 0,
     CANCELLED: ordersData?.CANCELLED ?? 0,
   }
+  const isMissing = !ordersData
 
   const metrics: MetricData[] = []
   const exceptions: MetricData[] = []
@@ -451,76 +452,71 @@ function createOrdersLifecycleStage(
     label: 'Orders',
     count: totalOrders,
     statusType: 'neutral',
-    target: { path: '/orders', defaultFilters: {} }
+    target: { path: '/orders', defaultFilters: {} },
+    isMissing
   })
 
   // Add metrics for different order statuses
-  if (counts.SERVICEABLE > 0) {
-    metrics.push({
-      metricId: 'orders-serviceable',
-      label: 'Serviceable',
-      count: counts.SERVICEABLE,
-      statusType: 'positive',
-      target: { path: '/orders', defaultFilters: { status: 'serviceable' } }
-    })
-  }
+  metrics.push({
+    metricId: 'orders-serviceable',
+    label: 'Serviceable',
+    count: counts.SERVICEABLE,
+    statusType: 'positive',
+    target: { path: '/orders', defaultFilters: { status: 'serviceable' } },
+    isMissing
+  })
 
-  if (counts.PROCESSING > 0) {
-    metrics.push({
-      metricId: 'orders-processing',
-      label: 'Processing',
-      count: counts.PROCESSING,
-      statusType: 'warning',
-      target: { path: '/orders', defaultFilters: { status: 'processing' } }
-    })
-  }
+  metrics.push({
+    metricId: 'orders-processing',
+    label: 'Processing',
+    count: counts.PROCESSING,
+    statusType: 'warning',
+    target: { path: '/orders', defaultFilters: { status: 'processing' } },
+    isMissing
+  })
 
-  if (counts.BOOKED > 0) {
-    metrics.push({
-      metricId: 'orders-booked',
-      label: 'Ready to Ship',
-      count: counts.BOOKED,
-      statusType: 'positive',
-      target: { path: '/orders', defaultFilters: { status: 'booked' } }
-    })
-  }
+  metrics.push({
+    metricId: 'orders-booked',
+    label: 'Ready to Ship',
+    count: counts.BOOKED,
+    statusType: 'positive',
+    target: { path: '/orders', defaultFilters: { status: 'booked' } },
+    isMissing
+  })
 
   // Add problematic statuses as exceptions
-  if (counts.UNSERVICEABLE > 0) {
-    exceptions.push({
-      metricId: 'orders-unserviceable',
-      label: 'Unserviceable',
-      count: counts.UNSERVICEABLE,
-      statusType: 'critical',
-      target: { path: '/orders', defaultFilters: { status: 'unserviceable' } }
-    })
-  }
+  exceptions.push({
+    metricId: 'orders-unserviceable',
+    label: 'Unserviceable',
+    count: counts.UNSERVICEABLE,
+    statusType: 'critical',
+    target: { path: '/orders', defaultFilters: { status: 'unserviceable' } },
+    isMissing
+  })
 
-  if (counts.FAILED > 0) {
-    exceptions.push({
-      metricId: 'orders-failed',
-      label: 'Failed',
-      count: counts.FAILED,
-      statusType: 'critical',
-      target: { path: '/orders', defaultFilters: { status: 'failed' } }
-    })
-  }
+  exceptions.push({
+    metricId: 'orders-failed',
+    label: 'Failed',
+    count: counts.FAILED,
+    statusType: 'critical',
+    target: { path: '/orders', defaultFilters: { status: 'failed' } },
+    isMissing
+  })
 
-  if (counts.CANCELLED > 0) {
-    exceptions.push({
-      metricId: 'orders-cancelled',
-      label: 'Cancelled',
-      count: counts.CANCELLED,
-      statusType: 'critical',
-      target: { path: '/orders', defaultFilters: { status: 'cancelled' } }
-    })
-  }
+  exceptions.push({
+    metricId: 'orders-cancelled',
+    label: 'Cancelled',
+    count: counts.CANCELLED,
+    statusType: 'critical',
+    target: { path: '/orders', defaultFilters: { status: 'cancelled' } },
+    isMissing
+  })
 
   const stage: LifecycleStage = {
     id: 'orders',
     title: 'Orders',
     metrics,
-    exceptions: exceptions.length > 0 ? exceptions : undefined
+    exceptions
   }
 
   if (error) {
@@ -546,6 +542,9 @@ function transformShipmentDataToTabData(
 
   const getMilestoneCount = (milestoneKey: keyof ShipmentMilestoneSummary): number => {
     return milestoneData[milestoneKey] ?? 0
+  }
+  const hasMilestone = (milestoneKey: keyof ShipmentMilestoneSummary): boolean => {
+    return milestoneData[milestoneKey] !== undefined
   }
 
   const getPriorityCountForBucket = (bucketKey: string): number | null => {
@@ -600,10 +599,11 @@ function transformShipmentDataToTabData(
   const exceptionRollupKeys = ['UNDELIVERED', 'RTO', 'AWAITING_UPDATES', 'NO_UPDATES'] as const
 
   const lifecycleStages: LifecycleStage[] = Object.entries(SHIPMENT_MILESTONE_MAPPING)
-    .filter(([milestoneKey]) => milestoneData[milestoneKey as keyof ShipmentMilestoneSummary] !== undefined)
     .filter(([milestoneKey]) => !exceptionRollupKeys.includes(milestoneKey as typeof exceptionRollupKeys[number]))
     .map(([milestoneKey, stageInfo]) => {
-      const milestoneCount = getMilestoneCount(milestoneKey as keyof ShipmentMilestoneSummary)
+      const milestoneKeyTyped = milestoneKey as keyof ShipmentMilestoneSummary
+      const milestoneCount = getMilestoneCount(milestoneKeyTyped)
+      const milestoneMissing = !hasMilestone(milestoneKeyTyped)
 
       // Create main metrics for each stage
       const metrics: MetricData[] = []
@@ -615,183 +615,158 @@ function transformShipmentDataToTabData(
       const bucketAnalytics = analyticsMap?.get(milestoneKey)
 
       // Always add the main milestone count as a metric
-      if (milestoneCount > 0) {
-        metrics.push({
-          metricId: `${stageInfo.id}-total`,
-          label: 'Total',
-          count: milestoneCount,
-          statusType: milestoneKey === 'EXCEPTIONS' || milestoneKey === 'UNDELIVERED' ? 'critical' : 'neutral',
-          target: { path: `/shipments/${stageInfo.id}`, defaultFilters: {} },
-          groupKey: 'summary',
-          groupLabel: null,
-          groupOrder: 0
-        })
-      }
+      metrics.push({
+        metricId: `${stageInfo.id}-total`,
+        label: 'Total',
+        count: milestoneCount,
+        statusType: milestoneKey === 'EXCEPTIONS' || milestoneKey === 'UNDELIVERED' ? 'critical' : 'neutral',
+        target: { path: `/shipments/${stageInfo.id}`, defaultFilters: {} },
+        groupKey: 'summary',
+        groupLabel: null,
+        groupOrder: 0,
+        isMissing: milestoneMissing
+      })
 
       // Add priority metrics as milestone breakdown if available
-      if (bucketAnalytics?.priority_summary) {
-        const prioritySummary = bucketAnalytics.priority_summary
-        const prioritiesToShow = selectedPriorities ?? ['high', 'standard', 'low']
-
-        prioritiesToShow.forEach((priority) => {
-          const count = prioritySummary[priority] ?? 0
-          if (count > 0) {
-            const label = `${priority.charAt(0).toUpperCase()}${priority.slice(1)} Priority`
-            metrics.push({
-              metricId: `${stageInfo.id}-priority-${priority}`,
-              label,
-              count,
-              statusType: priority === 'high' ? 'critical' : 'neutral',
-              target: {
-                path: `/shipments/${stageInfo.id}`,
-                defaultFilters: { priority }
-              },
-              groupKey: 'priority',
-              groupLabel: 'Priority',
-              groupOrder: 1
-            })
-          }
+      const prioritySummary = bucketAnalytics?.priority_summary
+      const prioritiesToShow = selectedPriorities ?? ['high', 'standard', 'low']
+      prioritiesToShow.forEach((priority) => {
+        const count = prioritySummary?.[priority] ?? 0
+        const label = `${priority.charAt(0).toUpperCase()}${priority.slice(1)} Priority`
+        metrics.push({
+          metricId: `${stageInfo.id}-priority-${priority}`,
+          label,
+          count,
+          statusType: priority === 'high' ? 'critical' : 'neutral',
+          target: {
+            path: `/shipments/${stageInfo.id}`,
+            defaultFilters: { priority }
+          },
+          groupKey: 'priority',
+          groupLabel: 'Priority',
+          groupOrder: 1,
+          isMissing: !prioritySummary
         })
-      }
+      })
 
-      if (bucketAnalytics?.pod_summary && (milestoneKey === 'DELIVERED' || milestoneKey === 'OUT_FOR_DELIVERY')) {
-        // Use POD breakdown as milestone for delivered/out_for_delivery stages
-        const podSummary = bucketAnalytics.pod_summary
+      if (milestoneKey === 'DELIVERED' || milestoneKey === 'OUT_FOR_DELIVERY') {
+        const podSummary = bucketAnalytics?.pod_summary
+        metrics.push({
+          metricId: `${stageInfo.id}-pod-available`,
+          label: 'POD Available',
+          count: podSummary ? parseInt(podSummary.pod_available) : 0,
+          statusType: 'positive',
+          target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { pod_status: 'available' } },
+          groupKey: 'epod',
+          groupLabel: 'ePOD',
+          groupOrder: 2,
+          isMissing: !podSummary
+        })
 
-        if (parseInt(podSummary.pod_available) > 0) {
-          metrics.push({
-            metricId: `${stageInfo.id}-pod-available`,
-            label: 'POD Available',
-            count: parseInt(podSummary.pod_available),
-            statusType: 'positive',
-            target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { pod_status: 'available' } },
-            groupKey: 'epod',
-            groupLabel: 'ePOD',
-            groupOrder: 2
-          })
-        }
-
-        if (parseInt(podSummary.pod_pending) > 0) {
-          metrics.push({
-            metricId: `${stageInfo.id}-pod-pending`,
-            label: 'POD Pending',
-            count: parseInt(podSummary.pod_pending),
-            statusType: 'warning',
-            target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { pod_status: 'pending' } },
-            groupKey: 'epod',
-            groupLabel: 'ePOD',
-            groupOrder: 2
-          })
-        }
+        metrics.push({
+          metricId: `${stageInfo.id}-pod-pending`,
+          label: 'POD Pending',
+          count: podSummary ? parseInt(podSummary.pod_pending) : 0,
+          statusType: 'warning',
+          target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { pod_status: 'pending' } },
+          groupKey: 'epod',
+          groupLabel: 'ePOD',
+          groupOrder: 2,
+          isMissing: !podSummary
+        })
       }
 
       // Handle ACTIVE bucket analytics (for OUT_FOR_DELIVERY milestone)
-      if (milestoneKey === 'OUT_FOR_DELIVERY' && bucketAnalytics?.ofd_summary) {
-        const ofdSummary = bucketAnalytics.ofd_summary
-        if (parseInt(ofdSummary.today) > 0) {
-          status.push({
-            metricId: `${stageInfo.id}-ofd-today`,
-            label: 'Today',
-            count: parseInt(ofdSummary.today),
-            statusType: 'positive',
-            target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { ofd_date: 'today' } }
-          })
-        }
-        if (parseInt(ofdSummary.tomorrow) > 0) {
-          status.push({
-            metricId: `${stageInfo.id}-ofd-tomorrow`,
-            label: 'Tomorrow',
-            count: parseInt(ofdSummary.tomorrow),
-            statusType: 'neutral',
-            target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { ofd_date: 'tomorrow' } }
-          })
-        }
+      if (milestoneKey === 'OUT_FOR_DELIVERY') {
+        const ofdSummary = bucketAnalytics?.ofd_summary
+        status.push({
+          metricId: `${stageInfo.id}-ofd-today`,
+          label: 'Today',
+          count: ofdSummary ? parseInt(ofdSummary.today) : 0,
+          statusType: 'positive',
+          target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { ofd_date: 'today' } },
+          isMissing: !ofdSummary
+        })
+        status.push({
+          metricId: `${stageInfo.id}-ofd-tomorrow`,
+          label: 'Tomorrow',
+          count: ofdSummary ? parseInt(ofdSummary.tomorrow) : 0,
+          statusType: 'neutral',
+          target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { ofd_date: 'tomorrow' } },
+          isMissing: !ofdSummary
+        })
       }
 
       // Handle delayed summary for ACTIVE bucket
-      if (bucketAnalytics?.delayed_summary) {
-        const delayedSummary = bucketAnalytics.delayed_summary
-        if (parseInt(delayedSummary['1 day']) > 0) {
-          status.push({
-            metricId: `${stageInfo.id}-delayed-1day`,
-            label: '1 Day',
-            count: parseInt(delayedSummary['1 day']),
-            statusType: 'warning',
-            target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { delayed_days: '1' } }
-          })
-        }
-        if (parseInt(delayedSummary['2-4 days']) > 0) {
-          status.push({
-            metricId: `${stageInfo.id}-delayed-2-4days`,
-            label: '2-4 Days',
-            count: parseInt(delayedSummary['2-4 days']),
-            statusType: 'warning',
-            target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { delayed_days: '2-4' } }
-          })
-        }
-        if (parseInt(delayedSummary['4+ days']) > 0) {
-          status.push({
-            metricId: `${stageInfo.id}-delayed-4plusdays`,
-            label: '4+ Days',
-            count: parseInt(delayedSummary['4+ days']),
-            statusType: 'critical',
-            target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { delayed_days: '4+' } }
-          })
-        }
-      }
+      const delayedSummary = bucketAnalytics?.delayed_summary
+      status.push({
+        metricId: `${stageInfo.id}-delayed-1day`,
+        label: '1 Day',
+        count: delayedSummary ? parseInt(delayedSummary['1 day']) : 0,
+        statusType: 'warning',
+        target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { delayed_days: '1' } },
+        isMissing: !delayedSummary
+      })
+      status.push({
+        metricId: `${stageInfo.id}-delayed-2-4days`,
+        label: '2-4 Days',
+        count: delayedSummary ? parseInt(delayedSummary['2-4 days']) : 0,
+        statusType: 'warning',
+        target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { delayed_days: '2-4' } },
+        isMissing: !delayedSummary
+      })
+      status.push({
+        metricId: `${stageInfo.id}-delayed-4plusdays`,
+        label: '4+ Days',
+        count: delayedSummary ? parseInt(delayedSummary['4+ days']) : 0,
+        statusType: 'critical',
+        target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { delayed_days: '4+' } },
+        isMissing: !delayedSummary
+      })
 
-      if (bucketAnalytics) {
-        // Add transit status metrics to status array
-        if (bucketAnalytics.transit_status_summary) {
-          const transitStatus = bucketAnalytics.transit_status_summary
-
-          if (transitStatus.on_time > 0) {
-            status.push({
-              metricId: `${stageInfo.id}-on-time`,
-              label: 'On Time',
-              count: transitStatus.on_time,
-              statusType: 'positive',
-              target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { transit_status: 'on_time' } }
-            })
-          }
-
-          if (transitStatus.delayed > 0) {
-            status.push({
-              metricId: `${stageInfo.id}-delayed`,
-              label: 'Delayed',
-              count: transitStatus.delayed,
-              statusType: 'warning',
-              target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { transit_status: 'delayed' } }
-            })
-          }
-
-        }
-      }
+      const transitStatus = bucketAnalytics?.transit_status_summary
+      status.push({
+        metricId: `${stageInfo.id}-on-time`,
+        label: 'On Time',
+        count: transitStatus?.on_time ?? 0,
+        statusType: 'positive',
+        target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { transit_status: 'on_time' } },
+        isMissing: !transitStatus
+      })
+      status.push({
+        metricId: `${stageInfo.id}-delayed`,
+        label: 'Delayed',
+        count: transitStatus?.delayed ?? 0,
+        statusType: 'warning',
+        target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { transit_status: 'delayed' } },
+        isMissing: !transitStatus
+      })
 
       // Add exceptions for the EXCEPTIONS milestone
       const exceptions: MetricData[] = []
-      if (milestoneKey === 'EXCEPTIONS' && milestoneCount > 0) {
+      if (milestoneKey === 'EXCEPTIONS') {
         exceptions.push({
           metricId: `${stageInfo.id}-exceptions`,
           label: 'Exception Shipments',
           count: milestoneCount,
           statusType: 'critical',
-          target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { type: 'exception' } }
+          target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { type: 'exception' } },
+          isMissing: milestoneMissing
         })
       }
 
       if (milestoneKey === 'EXCEPTIONS') {
         exceptionRollupKeys.forEach((rollupKey) => {
           const rollupCount = getMilestoneCount(rollupKey)
-          if (rollupCount > 0) {
-            exceptions.push({
-              metricId: `${stageInfo.id}-${rollupKey.toLowerCase()}`,
-              label: rollupKey.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase()),
-              count: rollupCount,
-              statusType: rollupKey === 'RTO' ? 'critical' : 'warning',
-              target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { milestone: rollupKey } }
-            })
-          }
+          const rollupMissing = !hasMilestone(rollupKey)
+          exceptions.push({
+            metricId: `${stageInfo.id}-${rollupKey.toLowerCase()}`,
+            label: rollupKey.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase()),
+            count: rollupCount,
+            statusType: rollupKey === 'RTO' ? 'critical' : 'warning',
+            target: { path: `/shipments/${stageInfo.id}`, defaultFilters: { milestone: rollupKey } },
+            isMissing: rollupMissing
+          })
         })
       }
 
@@ -799,8 +774,8 @@ function transformShipmentDataToTabData(
         id: stageInfo.id,
         title: stageInfo.title,
         metrics,
-        exceptions: exceptions.length > 0 ? exceptions : undefined,
-        status: status.length > 0 ? status : undefined
+        exceptions,
+        status
       }
     }
   )

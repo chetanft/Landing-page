@@ -12,6 +12,7 @@ interface ProgressItemProps {
 
 export default function ProgressItem({ metric, globalFilters, isFirst = false, isLast = false }: ProgressItemProps) {
   const navigate = useNavigate()
+  const displayCount = metric.isMissing ? '-' : metric.count.toLocaleString()
 
   const getExternalUrl = () => {
     const planningBase = 'https://www.freighttiger.com/v10/planning/dashboard'
@@ -57,7 +58,9 @@ export default function ProgressItem({ metric, globalFilters, isFirst = false, i
     }
   }
 
-  const tooltipText = `${metric.label}: Click to view ${metric.count.toLocaleString()} items`
+  const tooltipText = metric.isMissing
+    ? `${metric.label}: No data available`
+    : `${metric.label}: Click to view ${metric.count.toLocaleString()} items`
 
   return (
     <div style={{ display: 'flex', gap: 'var(--spacing-x2)', alignItems: 'stretch', borderRadius: 'var(--radius-md)' }}>
@@ -110,7 +113,7 @@ export default function ProgressItem({ metric, globalFilters, isFirst = false, i
         role="button"
         tabIndex={0}
         title={tooltipText}
-        aria-label={`${metric.label}: ${metric.count}. Click to view details.`}
+        aria-label={`${metric.label}: ${metric.isMissing ? 'No data available' : metric.count}. Click to view details.`}
         onMouseEnter={(e) => {
           e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'
         }}
@@ -129,7 +132,7 @@ export default function ProgressItem({ metric, globalFilters, isFirst = false, i
           {metric.label}
         </Typography>
         <Typography variant="body-primary-semibold" color="primary" style={{ fontSize: 'var(--font-size-md)' }}>
-          {metric.count.toLocaleString()}
+          {displayCount}
         </Typography>
       </div>
     </div>

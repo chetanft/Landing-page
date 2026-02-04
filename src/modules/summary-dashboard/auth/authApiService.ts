@@ -28,6 +28,12 @@ const buildApiUrl = (path: string): string => {
   return path.startsWith('http') ? path : `https://api.freighttiger.com${path}`
 }
 
+const FT_USER_ID_PATTERN = /^[A-Z]{3}-[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$/
+
+const isValidFtUserId = (value?: string): value is string => {
+  return typeof value === 'string' && FT_USER_ID_PATTERN.test(value)
+}
+
 export interface LoginRequest {
   username?: string
   email?: string
@@ -346,9 +352,9 @@ export class AuthApiService {
    */
   static async refreshToken(refreshToken: string): Promise<RefreshTokenResponse> {
     try {
-      const storedUserId = TokenManager.getUserContext()?.userId
-      let userId = storedUserId
-      if (!userId) {
+      const storedUserFteid = TokenManager.getUserContext()?.userFteid
+      let userFteid = storedUserFteid
+      if (!userFteid) {
         const accessToken = TokenManager.getAccessToken()
         if (accessToken) {
           try {
@@ -357,17 +363,17 @@ export class AuthApiService {
               const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
               const decoded = JSON.parse(atob(normalized))
               const ucv = decoded?.ucv || {}
-              userId = String(ucv.id || decoded.sub || decoded.userId || '')
+              userFteid = String(ucv.userFteid || ucv.fteid || decoded?.userFteid || decoded?.fteid || '')
             }
           } catch {
-            // Ignore decode errors; refresh will fail if userId is required.
+            // Ignore decode errors; refresh will fail if userFteid is required.
           }
         }
       }
 
       const headers = this.getHeaders()
-      if (userId) {
-        headers['x-ft-userid'] = userId
+      if (userFteid && isValidFtUserId(userFteid)) {
+        headers['x-ft-userid'] = userFteid
       }
 
       const response = await fetch(`${this.getBaseUrl()}/refresh`, {
