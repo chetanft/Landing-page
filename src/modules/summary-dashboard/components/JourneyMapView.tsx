@@ -25,7 +25,6 @@ const DEFAULT_VIEW_STATE = {
 const FALLBACK_ON_TIME_COLOR: [number, number, number, number] = [34, 197, 94, 220]
 const FALLBACK_DELAYED_COLOR: [number, number, number, number] = [239, 68, 68, 220]
 const POINTS_MIN_ZOOM = 10
-const LABEL_SHADOW_COLOR = new Uint8ClampedArray([0, 0, 0, 200])
 
 const parseCssColor = (value: string, fallback: [number, number, number, number]): [number, number, number, number] => {
   const trimmed = value.trim()
@@ -165,21 +164,6 @@ export default function JourneyMapView({ tabData, globalFilters }: JourneyMapVie
       pickable: false
     })
 
-    const countShadow = new TextLayer<{ lng: number; lat: number; count: number }>({
-      id: showPoints ? 'journey-counts-shadow-points' : 'journey-heatmap-counts-shadow',
-      data: gridCounts,
-      getPosition: d => [d.lng, d.lat],
-      getText: d => String(d.count),
-      getSize: 18,
-      sizeUnits: 'pixels',
-      getColor: LABEL_SHADOW_COLOR,
-      fontFamily: 'var(--font-family-base, system-ui, -apple-system, Segoe UI, sans-serif)',
-      billboard: true,
-      getTextAnchor: 'middle',
-      getAlignmentBaseline: 'center',
-      characterSet: '0123456789',
-      pickable: false
-    })
 
     const countLabels = new TextLayer<{ lng: number; lat: number; count: number }>({
       id: showPoints ? 'journey-counts-points' : 'journey-heatmap-counts',
@@ -189,7 +173,7 @@ export default function JourneyMapView({ tabData, globalFilters }: JourneyMapVie
       getSize: 14,
       sizeUnits: 'pixels',
       getColor: labelColor,
-      fontFamily: 'var(--font-family-base, system-ui, -apple-system, Segoe UI, sans-serif)',
+      fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif',
       billboard: true,
       getTextAnchor: 'middle',
       getAlignmentBaseline: 'center',
@@ -215,7 +199,6 @@ export default function JourneyMapView({ tabData, globalFilters }: JourneyMapVie
           pickable: true
         }),
         countBadge,
-        countShadow,
         countLabels
       ]
     }
@@ -239,7 +222,7 @@ export default function JourneyMapView({ tabData, globalFilters }: JourneyMapVie
       opacity: 0.5
     })
 
-    return [heatmap, countBadge, countShadow, countLabels]
+    return [heatmap, countBadge, countLabels]
   }, [visiblePoints, delayedPoints, showPoints, viewState.zoom, onTimeColor, delayedColor, labelColor])
 
   if (visiblePoints.length === 0) {

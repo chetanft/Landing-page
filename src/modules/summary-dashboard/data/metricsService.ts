@@ -1,5 +1,5 @@
 import type { TabId, TabData, MetricData, LifecycleStage, GlobalFilters } from '../types/metrics'
-import { fetchJourneyCounts, fetchJourneyMetrics } from './journeyApiService'
+import { fetchJourneyMetrics, fetchJourneyCountsOnly, getJourneyDoCountsByStatus } from './journeyApiService'
 import { fetchShipmentMetrics } from './shipmentsApiService'
 import { realApiService } from './realApiService'
 import { fetchOrdersBucketSummary } from './ordersApiService'
@@ -197,6 +197,29 @@ const buildRealOrdersLifecycleStages = async (
       isMissing: dispatchedInfo.isMissing
     })
 
+    const doCounts = getJourneyDoCountsByStatus()
+    const hasDoCounts = Object.values(doCounts).some((value) => value > 0)
+    const ftlGroup = 'orders.in_execution.ftl'
+    const ftlGroupLabel = 'FTL'
+    const addFtlMetric = (metricId: string, label: string, count: number) => {
+      inExecutionMetrics.push({
+        metricId,
+        label,
+        count,
+        statusType: 'neutral',
+        target: { path: '/tms/orders', defaultFilters: {} },
+        isMissing: !hasDoCounts,
+        groupKey: ftlGroup,
+        groupLabel: ftlGroupLabel,
+        groupOrder: 1
+      })
+    }
+
+    addFtlMetric('orders.in_execution.ftl.en_route', 'En route to loading', doCounts.BEFORE_ORIGIN ?? 0)
+    addFtlMetric('orders.in_execution.ftl.at_loading', 'At loading', doCounts.AT_ORIGIN ?? 0)
+    addFtlMetric('orders.in_execution.ftl.in_transit', 'In transit', doCounts.IN_TRANSIT ?? 0)
+    addFtlMetric('orders.in_execution.ftl.at_destination', 'At destination', doCounts.AT_DESTINATION ?? 0)
+
     return [
       // Planning Column
       {
@@ -388,7 +411,7 @@ export const fetchTabCounts = async (
   globalFilters: GlobalFilters
 ): Promise<TabData> => {
   if (tab === 'journeys') {
-    return fetchJourneyCounts(globalFilters)
+    return fetchJourneyCountsOnly(globalFilters)
   }
 
   if (tab === 'orders') {

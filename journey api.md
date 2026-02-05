@@ -733,3 +733,116 @@ curl 'https://api.freighttiger.com/api/journey-snapshot/v1/journeys/JRN-b1e94fd9
         }
     ]
 }
+
+
+
+
+
+curl 'https://api.freighttiger.com/api/journey-snapshot/v1/journeys/JRN-0ff56d20-4f44-4b6f-9456-523b60011514/details/loads?entity_type=CNR&journey_stop_type=source&journey_direction=outbound' \
+  -H 'accept: application/json, text/plain, */*' \
+  -H 'accept-language: en-GB,en-US;q=0.9,en;q=0.8' \
+  -H 'authorization: Bearer ' \
+  -H 'content-type: application/json' \
+  -H 'origin: https://www.freighttiger.com' \
+  -H 'priority: u=1, i' \
+  -H 'referer: https://www.freighttiger.com/' \
+  -H 'sec-ch-ua: "Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-site' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36'
+
+
+  {
+    "success": true,
+    "data": {
+        "loads": [
+            {
+                "load_id": 536691,
+                "customer_load_id": "LOAD-1770209346710",
+                "status": "IN_TRANSIT",
+                "from": {
+                    "address": "2080066 - 2080066 - VIJAY AUTOMOBILES - 2080066 - VIJAY AUTOMOBILES , Near Rajasthan Patrika,Old Industrial Area,,Alwar 2080066 - VIJAY AUTOMOBILES",
+                    "label": "2080066 - VIJAY AUTOMOBILES",
+                    "lat": 27.54262126,
+                    "lng": 76.62799927,
+                    "consignor_name": "TATA MOTORS LIMITED ",
+                    "consignor_fteid": "BRH-a3faafe5-46f8-4c81-b9b4-234be5ebae32",
+                    "phone_number": null,
+                    "consignee_name": "VIJAY AUTOMOBILES",
+                    "consignee_fteid": "COM-1b955c7a-273c-41e7-a28c-2f0aedc0bf47",
+                    "consigne_phone_number": "9314716192,919314716192",
+                    "stop_action_type": "pickup"
+                },
+                "to": {
+                    "address": "2088668 - 2088668-JAGVIJAY MOTORS INDIA PVT LTD - 2088668-JAGVIJAY MOTORS INDIA PVT LTD-SH-25, JAIPUR BHIWADI MEGA HIGHWAY,ALWAR,301001- PINCODE--301001 2088668-JAGVIJAY MOTORS INDIA PVT LTD",
+                    "label": "2088668 - JAGVIJAY MOTORS INDIA PVT LTD",
+                    "lat": 27.4966161,
+                    "lng": 76.5025742,
+                    "consignor_name": "TATA MOTORS LIMITED ",
+                    "consignor_fteid": "BRH-a3faafe5-46f8-4c81-b9b4-234be5ebae32",
+                    "phone_number": null,
+                    "consignee_name": "VIJAY AUTOMOBILES",
+                    "consignee_fteid": "COM-1b955c7a-273c-41e7-a28c-2f0aedc0bf47",
+                    "consigne_phone_number": "9314716192,919314716192",
+                    "stop_action_type": "drop"
+                },
+                "consignee_fteid": "COM-1b955c7a-273c-41e7-a28c-2f0aedc0bf47",
+                "consignor_fteid": "BRH-a3faafe5-46f8-4c81-b9b4-234be5ebae32",
+                "invoices": [
+                    {
+                        "to_contact_email": [],
+                        "so_release_date": null,
+                        "do_quantity": 0,
+                        "load_id": 536691,
+                        "description": "",
+                        "created_at": 1770209347312,
+                        "associated_so_numbers": null,
+                        "from_name": "",
+                        "invoice_date": null,
+                        "total_invoice_value": 0,
+                        "from_billing_address": "",
+                        "to_shipping_address": "",
+                        "po_number": "",
+                        "associated_do_numbers": null,
+                        "updated_at": 1770209347312,
+                        "item_details": [],
+                        "price": {},
+                        "from_contact_email": [],
+                        "from_shipping_address": "",
+                        "currency": "INR",
+                        "do_number": "",
+                        "invoice_number": "",
+                        "to_contact_phone": [],
+                        "do_date": null,
+                        "eway_bill_expiry_date": null,
+                        "fteid": "INV-18d75897-919d-49b4-a5e9-2dd9f6acf77c",
+                        "to_name": "",
+                        "so_number": "",
+                        "custom_fields": {},
+                        "tax": {},
+                        "so_quantity": 0,
+                        "to_gstin": "",
+                        "to_billing_address": "",
+                        "so_date": null,
+                        "do_publish_date": null,
+                        "eway_bill_no": "",
+                        "from_contact_phone": [],
+                        "from_gstin": ""
+                    }
+                ],
+                "eta": "2026-02-05 04:26:18",
+                "sta": null,
+                "distance_remaining_from_destination": 35.468,
+                "last_known_location": "8H7X+8XJ, Dabad colony, Poonkhar, Rajasthan 301414, India",
+                "last_ping": "2026-02-05 03:19:18",
+                "pickup_eta": null,
+                "pickup_ata": null,
+                "destination_ata": null,
+                "analytics_endtime": null
+            }
+        ]
+    }
+}

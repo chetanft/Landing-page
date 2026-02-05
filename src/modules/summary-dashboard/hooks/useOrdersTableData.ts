@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { fetchOrders } from '../data/ordersApiService'
+import { getJourneyDoRows, subscribeToJourneySearchUpdates } from '../data/journeyApiService'
 import type { OrderRow, OrderSummary, PaginationMeta } from '../types/orders'
 import type { GlobalFilters } from '../types/metrics'
 
@@ -90,9 +91,51 @@ export function useOrdersTableData({
     }
   }
 
+  const mergeJourneyDoRows = () => {
+    const journeyRows = getJourneyDoRows()
+    if (journeyRows.length === 0) return
+    setOrders((prev) => {
+      const existingIds = new Set(prev.map(item => item.id))
+      const existingOrderIds = new Set(prev.map(item => item.orderId))
+      const mapped = journeyRows.map((row) => ({
+        id: `do-${row.journeyId}-${row.doNumber}`,
+        orderId: row.doNumber,
+        soNumber: row.soNumbers.join(', '),
+        consignorName: row.consignorName,
+        consigneeName: row.consigneeName,
+        route: row.route,
+        tripType: row.tripType as any,
+        stage: row.stage,
+        milestone: row.milestone,
+        status: row.status as any,
+        relatedIdType: row.relatedIdType as any,
+        relatedId: row.relatedId,
+        deliveryEta: undefined,
+        deliveryStatus: '' as any,
+        dispatchDate: row.dispatchDate,
+        customData: {}
+      }))
+      const merged = [...prev]
+      mapped.forEach((item) => {
+        if (!existingIds.has(item.id) && !existingOrderIds.has(item.orderId)) {
+          merged.push(item)
+        }
+      })
+      return merged
+    })
+  }
+
   useEffect(() => {
     loadData()
   }, [filterKey])
+
+  useEffect(() => {
+    const unsubscribe = subscribeToJourneySearchUpdates(() => {
+      mergeJourneyDoRows()
+    })
+    mergeJourneyDoRows()
+    return unsubscribe
+  }, [])
 
   return {
     orders,

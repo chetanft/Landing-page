@@ -136,6 +136,36 @@ interface EpodSummaryResult {
   isMissing: boolean
 }
 
+interface JourneyLoadInvoice {
+  so_number?: string
+  do_number?: string
+  associated_so_numbers?: string[] | null
+  associated_do_numbers?: string[] | null
+}
+
+interface JourneyLoad {
+  load_id: number | string
+  status?: string
+  from?: {
+    label?: string
+    address?: string
+  }
+  to?: {
+    label?: string
+    address?: string
+  }
+  invoices?: JourneyLoadInvoice[]
+  eta?: string | null
+  sta?: string | null
+}
+
+interface JourneyLoadsResponse {
+  success: boolean
+  data?: {
+    loads?: JourneyLoad[]
+  }
+}
+
 // Map API milestones to lifecycle stages
 const MILESTONE_TO_STAGE_MAPPING = {
   BEFORE_ORIGIN: {
@@ -186,6 +216,7 @@ const journeySearchCache = new Map<JourneyMilestoneKey, JourneySearchItem[]>()
 const journeySearchSubscribers = new Set<() => void>()
 const journeySearchAbortControllers = new Map<JourneyMilestoneKey, AbortController>()
 let journeySearchCacheKey: string | null = null
+const journeyLoadsCache = new Map<string, JourneyLoadsResponse>()
 const journeyTrackingDetailsCache = new Map<string, any>()
 const journeyAlertsCache = new Map<string, any>()
 const journeyTrackingPathCache = new Map<string, any[]>()
@@ -370,6 +401,31 @@ const buildJourneyDetailsUrl = (journeyFteid: string, path: string, globalFilter
 
 const buildJourneyPodSummaryUrl = (journeyFteid: string): string => {
   return buildFtTmsUrl(`/api/epod-service-v2/v1/journey-fte/pod-summary/journey_fteid/${journeyFteid}`)
+}
+
+const fetchJourneyLoads = async (
+  journeyFteid: string,
+  globalFilters: GlobalFilters
+): Promise<JourneyLoad[] | null> => {
+  if (journeyLoadsCache.has(journeyFteid)) {
+    return journeyLoadsCache.get(journeyFteid)?.data?.loads ?? null
+  }
+
+  const url = buildJourneyDetailsUrl(journeyFteid, 'details/loads', globalFilters)
+  try {
+    const response = await ftTmsFetch(url, { method: 'GET' })
+    const data: JourneyLoadsResponse = await response.json()
+    if (data?.success) {
+      journeyLoadsCache.set(journeyFteid, data)
+      notifyJourneySearchUpdate()
+      return data.data?.loads ?? []
+    }
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.warn('[fetchJourneyLoads] Failed:', error)
+    }
+  }
+  return null
 }
 
 const buildJourneyRequestHeaders = (): Record<string, string> => {
@@ -622,7 +678,8 @@ const prefetchJourneyDetails = async (
         fetchJourneyTrackingDetails(journeyFteid, globalFilters),
         fetchJourneyAlerts(journeyFteid, globalFilters),
         fetchJourneyTrackingPath(journeyFteid, globalFilters),
-        fetchJourneyPodSummary(journeyFteid)
+        fetchJourneyPodSummary(journeyFteid),
+        fetchJourneyLoads(journeyFteid, globalFilters)
       ])
     }
   }
@@ -1390,6 +1447,24 @@ export interface JourneyMapPoint {
   tracking_health?: string
 }
 
+export interface JourneyDoRow {
+  journeyId: string
+  journeyStatus: JourneyMilestoneKey
+  doNumber: string
+  soNumbers: string[]
+  consignorName: string
+  consigneeName: string
+  route: string
+  tripType: string
+  stage: string
+  milestone: string
+  status: string
+  relatedIdType: string
+  relatedId: string
+  deliveryStatus: string
+  dispatchDate?: string
+}
+
 /**
  * Get map points for all journeys with valid coordinates
  * Encapsulates cache access and builds unified map points from cached journey data
@@ -1515,4 +1590,127 @@ export function getJourneyMapPoints(_globalFilters: GlobalFilters): JourneyMapPo
   }
 
   return mapPoints
+}
+
+const getJourneyStageLabel = (status: JourneyMilestoneKey): string => {
+  const mapping: Record<JourneyMilestoneKey, string> = {
+    PLANNED: 'Vehicle procurement',
+    BEFORE_ORIGIN: 'En route to loading',
+    AT_ORIGIN: 'At Loading',
+    IN_TRANSIT: 'In Transit',
+    AT_DESTINATION: 'At Destination',
+    IN_RETURN: 'In Return',
+    AFTER_DESTINATION: 'Delivered',
+    CLOSED: 'Delivered'
+  }
+  return mapping[status] ?? 'In Transit'
+}
+
+const getOrderStage = (status: JourneyMilestoneKey): string => {
+  if (['BEFORE_ORIGIN', 'AT_ORIGIN', 'IN_TRANSIT', 'AT_DESTINATION'].includes(status)) {
+    return 'In execution'
+  }
+  if (['AFTER_DESTINATION', 'CLOSED'].includes(status)) {
+    return 'Delivered'
+  }
+  return 'Planning'
+}
+
+export const getJourneyDoRows = (): JourneyDoRow[] => {
+  const rows: JourneyDoRow[] = []
+
+  for (const [status, journeys] of journeySearchCache.entries()) {
+    const milestoneLabel = getJourneyStageLabel(status)
+    const stageLabel = getOrderStage(status)
+    journeys.forEach((journey) => {
+      const journeyId = journey.journey_fteid
+      if (!journeyId) return
+      const loads = journeyLoadsCache.get(journeyId)?.data?.loads ?? []
+      if (!loads || loads.length === 0) return
+
+      loads.forEach((load) => {
+        const fromLabel = load.from?.label || load.from?.address || ''
+        const toLabel = load.to?.label || load.to?.address || ''
+        const route = fromLabel && toLabel ? `${fromLabel} → ${toLabel}` : fromLabel || toLabel
+        const consignorName = load.from?.label || ''
+        const consigneeName = load.to?.label || ''
+        const statusLabel = load.status || journey.journey_status || ''
+
+        const invoices = load.invoices ?? []
+        invoices.forEach((invoice) => {
+          const doNumbers = [
+            invoice.do_number,
+            ...(invoice.associated_do_numbers ?? [])
+          ].filter((item): item is string => Boolean(item))
+
+          const soNumbers = [
+            invoice.so_number,
+            ...(invoice.associated_so_numbers ?? [])
+          ].filter((item): item is string => Boolean(item))
+
+          doNumbers.forEach((doNumber) => {
+            rows.push({
+              journeyId,
+              journeyStatus: status,
+              doNumber,
+              soNumbers,
+              consignorName,
+              consigneeName,
+              route,
+              tripType: 'FTL',
+              stage: stageLabel,
+              milestone: milestoneLabel,
+              status: statusLabel,
+              relatedIdType: 'Trip',
+              relatedId: journeyId,
+              deliveryStatus: '',
+              dispatchDate: undefined
+            })
+          })
+        })
+      })
+    })
+  }
+
+  return rows
+}
+
+export const getJourneyDoCountsByStatus = (): Record<string, number> => {
+  const counts: Record<string, number> = {
+    BEFORE_ORIGIN: 0,
+    AT_ORIGIN: 0,
+    IN_TRANSIT: 0,
+    AT_DESTINATION: 0
+  }
+
+  const seenByStatus = new Map<JourneyMilestoneKey, Set<string>>()
+
+  for (const [status, journeys] of journeySearchCache.entries()) {
+    if (!['BEFORE_ORIGIN', 'AT_ORIGIN', 'IN_TRANSIT', 'AT_DESTINATION'].includes(status)) {
+      continue
+    }
+    if (!seenByStatus.has(status)) {
+      seenByStatus.set(status, new Set<string>())
+    }
+    const seen = seenByStatus.get(status)!
+    journeys.forEach((journey) => {
+      const journeyId = journey.journey_fteid
+      if (!journeyId) return
+      const loads = journeyLoadsCache.get(journeyId)?.data?.loads ?? []
+      loads.forEach((load) => {
+        const invoices = load.invoices ?? []
+        invoices.forEach((invoice) => {
+          const doNumbers = [
+            invoice.do_number,
+            ...(invoice.associated_do_numbers ?? [])
+          ].filter((item): item is string => Boolean(item))
+
+          doNumbers.forEach((doNumber) => seen.add(doNumber))
+        })
+      })
+    })
+    counts[status] = seen.size
+  }
+
+  return counts
 }

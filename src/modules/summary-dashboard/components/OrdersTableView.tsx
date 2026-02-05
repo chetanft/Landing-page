@@ -4,7 +4,6 @@ import { useOrdersTableData } from '../hooks/useOrdersTableData'
 import { getCustomDataTemplate } from '../data/ordersApiService'
 import type { OrderRow, OrderStatus, CustomDataTemplateField } from '../types/orders'
 import type { GlobalFilters } from '../types/metrics'
-import ErrorBanner from './ErrorBanner'
 import TableSkeleton from './TableSkeleton'
 import { formatDateTime } from '../utils/ordersFormat'
 
@@ -23,7 +22,7 @@ export default function OrdersTableView({
   globalFilters,
   onOpenDetails,
 }: OrdersTableViewProps) {
-  const { orders, isLoading, error, refetch } = useOrdersTableData({
+  const { orders, isLoading, error } = useOrdersTableData({
     selectedFilters,
     selectedOutboundOption,
     globalFilters,
@@ -84,16 +83,15 @@ export default function OrdersTableView({
     return <TableSkeleton />
   }
 
-  if (error) {
-    return <ErrorBanner error={error} onRetry={refetch} />
-  }
+  const hasError = Boolean(error)
 
   const getCellValue = (value: string | number | null | undefined): string => {
     if (value === null || value === undefined || value === '') return '-'
     return String(value)
   }
 
-  const showNoData = orders.length === 0
+  const tableOrders = hasError ? [] : orders
+  const showNoData = tableOrders.length === 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-x4)', width: '100%' }}>
@@ -189,7 +187,7 @@ export default function OrdersTableView({
                 </TableCell>
               </TableRow>
             ) : (
-              orders.map((row: OrderRow) => (
+              tableOrders.map((row: OrderRow) => (
                 <TableRow
                   key={row.id}
                   onMouseEnter={(e) => {
