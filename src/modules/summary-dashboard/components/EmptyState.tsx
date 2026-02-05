@@ -1,4 +1,4 @@
-import { Button, Row, Col, Typography, Icon, Spacer } from 'ft-design-system'
+import { Button, Row, Col, Typography, Icon, Spacer, type IconName } from 'ft-design-system'
 
 export type EmptyStateVariant = 'no-data' | 'no-results' | 'api-unavailable'
 
@@ -10,9 +10,9 @@ interface EmptyStateProps {
   onAction?: () => void
 }
 
-const variantConfig: Record<EmptyStateVariant, { icon: string; defaultTitle: string; defaultDescription: string }> = {
+const variantConfig: Record<EmptyStateVariant, { icon: IconName; defaultTitle: string; defaultDescription: string }> = {
   'no-data': {
-    icon: 'inbox',
+    icon: 'info',
     defaultTitle: 'No orders found',
     defaultDescription: 'There are no orders available at this time.',
   },
@@ -42,15 +42,15 @@ export default function EmptyState({
       <Row justify="center" align="middle" style={{ minHeight: 'calc(var(--spacing-x24) * 3)' }}>
         <Col span={12} style={{ textAlign: 'center' }}>
           <Icon name={config.icon} size={48} />
-          <Spacer size="medium" />
+          <Spacer size={"medium" as any} />
           <Typography variant="title-secondary">{title || config.defaultTitle}</Typography>
-          <Spacer size="small" />
+          <Spacer size={"small" as any} />
           <Typography variant="body-primary-regular" style={{ color: 'var(--text-secondary)' }}>
             {description || config.defaultDescription}
           </Typography>
           {onAction && actionLabel && (
             <>
-              <Spacer size="large" />
+              <Spacer size={"large" as any} />
               <Button variant="primary" size="md" onClick={onAction}>
                 {actionLabel}
               </Button>

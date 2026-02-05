@@ -206,5 +206,4 @@ export function useOrderDrawerData({
 }
 
 // Re-export types
-import type { CommentTemplate } from '../types/orders'
 export type { DrawerTab, CommentTemplate }

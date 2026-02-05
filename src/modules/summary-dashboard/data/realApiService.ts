@@ -110,7 +110,6 @@ const planningFetch = async (
   return doFetch(baseUrl, primary.token, primary.source)
 }
 
-const BASE_URL = buildFtTmsUrl('/planning-engine-service/v1/api')
 const ACCESS_CONTROL_BASE_URL = buildFtTmsUrl('/api/access-control/v1')
 const ENTITY_SERVICE_BASE_URL = buildFtTmsUrl('/api/entity-service/v1')
 const EQS_BASE_URL = buildFtTmsUrl('/api/eqs/v1')

@@ -43,7 +43,7 @@ export default function TitleBar({ globalFilters, onFiltersChange }: TitleBarPro
   const [localDateRange, setLocalDateRange] = useState(globalFilters.dateRange)
   const injectedOptionsRef = useRef<Set<HTMLElement>>(new Set())
   const observerRef = useRef<MutationObserver | null>(null)
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isInteractingRef = useRef<boolean>(false)
 
   useEffect(() => {
@@ -82,6 +82,13 @@ export default function TitleBar({ globalFilters, onFiltersChange }: TitleBarPro
     },
     [onFiltersChange]
   )
+
+  const formatDateForInput = (date: Date): string => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
 
   const parseDateValue = (value: string): Date | null => {
     if (!value) return null
@@ -251,8 +258,6 @@ export default function TitleBar({ globalFilters, onFiltersChange }: TitleBarPro
 
       // If all 4 custom options exist and are in correct positions, skip reordering
       if (last2WeeksElement && last1MonthElement && last3MonthsElement && next2WeeksElement) {
-        const last2WeeksIndex = allChildren.indexOf(last2WeeksElement)
-        const last1MonthIndex = allChildren.indexOf(last1MonthElement)
         const last3MonthsIndex = allChildren.indexOf(last3MonthsElement)
         const next2WeeksIndex = allChildren.indexOf(next2WeeksElement)
         
@@ -549,8 +554,8 @@ export default function TitleBar({ globalFilters, onFiltersChange }: TitleBarPro
             <div className="date-picker-wrapper" style={{ width: '100%' }}>
               <DatePicker
                 range
-                startValue={localDateRange.start}
-                endValue={localDateRange.end}
+                startValue={formatDateForInput(localDateRange.start)}
+                endValue={formatDateForInput(localDateRange.end)}
                 onStartChange={handleStartDateChange}
                 onEndChange={handleEndDateChange}
                 placeholder="Select date range"

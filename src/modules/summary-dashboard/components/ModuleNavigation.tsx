@@ -1,8 +1,8 @@
 import React from 'react'
-import { Card, Typography, Button, Row, Col, Spacer } from 'ft-design-system'
+import { Card, Typography, Button, Row, Col } from 'ft-design-system'
 import { MODULE_CONFIGS, navigationUtils } from '../config/moduleNavigation'
 import { usePermissions } from '../hooks/usePermissions'
-import type { TabData, MetricData } from '../types/metrics'
+import type { TabData } from '../types/metrics'
 
 export interface ModuleNavigationProps {
   tabData?: TabData | null
@@ -15,14 +15,14 @@ export const ModuleNavigation: React.FC<ModuleNavigationProps> = ({
 }) => {
   const { canAccessModule } = usePermissions()
 
-  const handleModuleClick = (moduleId: string, event: React.MouseEvent) => {
+  const handleModuleClick = (_moduleId: string, event: React.MouseEvent) => {
     event.preventDefault()
 
     if (onModuleClick) {
-      onModuleClick(moduleId)
+      onModuleClick(_moduleId)
     } else {
       // Default navigation behavior
-      navigationUtils.navigateToModule(moduleId)
+      navigationUtils.navigateToModule(_moduleId)
     }
   }
 
@@ -55,7 +55,7 @@ export const ModuleNavigation: React.FC<ModuleNavigationProps> = ({
     }
   }
 
-  const getModuleStatus = (moduleId: string): 'positive' | 'warning' | 'critical' | 'neutral' => {
+const getModuleStatus = (_moduleId: string): 'positive' | 'warning' | 'critical' | 'neutral' => {
     if (!tabData) return 'neutral'
 
     // Check for exceptions in the module data
@@ -110,11 +110,11 @@ export const ModuleNavigation: React.FC<ModuleNavigationProps> = ({
                 aria-label={`Navigate to ${module.label}`}
               >
                 <div>
-                  <Typography variant="title-tertiary" style={{ marginBottom: 'var(--spacing-x2)' }}>
+                  <Typography variant="title-primary" style={{ marginBottom: 'var(--spacing-x2)' }}>
                     {module.label}
                   </Typography>
                   <Typography
-                    variant="body-small-regular"
+                    variant="body-secondary-regular"
                     style={{
                       color: 'var(--color-text-secondary)',
                       marginBottom: 'var(--spacing-x3)'
@@ -139,7 +139,7 @@ export const ModuleNavigation: React.FC<ModuleNavigationProps> = ({
                             'var(--color-text-tertiary)'
                         }}
                       />
-                      <Typography variant="body-small-medium">
+                      <Typography variant="body-secondary-medium">
                         {count.toLocaleString()}
                       </Typography>
                     </div>
@@ -232,10 +232,9 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
         {availableActions.map((action) => (
           <Col key={action.id} xs={24} sm={12} md={6}>
             <Button
-              block
               variant="secondary"
               onClick={(e) => handleActionClick(action, e)}
-              style={{ height: '48px' }}
+              style={{ height: '48px', width: '100%' }}
             >
               {action.label}
             </Button>

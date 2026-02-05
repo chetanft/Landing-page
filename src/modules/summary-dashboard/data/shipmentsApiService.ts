@@ -73,23 +73,6 @@ interface ShipmentSpecificSummaryApiResponse {
   data: ShipmentSpecificBucketSummary
 }
 
-interface ShipmentApiResponse {
-  success: boolean
-  data: Array<{
-    shipment_id: string
-    milestone: string
-    booking_date: string
-    status: string
-    // Add other fields as needed
-  }>
-  pagination: {
-    current: number
-    last: number
-    size: number
-    total: number
-  }
-}
-
 interface OrdersBucketSummary {
   SERVICEABLE: number
   UNSERVICEABLE: number
@@ -155,7 +138,12 @@ export const fetchShipmentMetrics = async (globalFilters: GlobalFilters): Promis
     console.log('[fetchShipmentMetrics] Calling real shipments API')
   }
 
-  return fetchShipmentMetricsFromAPI(globalFilters)
+  try {
+    return await fetchShipmentMetricsFromAPI(globalFilters)
+  } catch (error) {
+    console.warn('[fetchShipmentMetrics] Failed to load shipments, returning missing data:', error)
+    return createMissingShipmentTabData(globalFilters)
+  }
 }
 
 /**
@@ -351,7 +339,18 @@ export const fetchShipmentMetricsFromAPI = async (globalFilters: GlobalFilters):
     let ordersBucketError: string | null = null
 
     if (ordersResult.status === 'fulfilled') {
-      ordersBucketData = ordersResult.value
+      const value = ordersResult.value
+      // Normalize the data to match OrdersBucketSummary type (all properties must be numbers, not undefined)
+      if (value && typeof value === 'object') {
+        ordersBucketData = {
+          SERVICEABLE: value.SERVICEABLE ?? 0,
+          UNSERVICEABLE: value.UNSERVICEABLE ?? 0,
+          PROCESSING: value.PROCESSING ?? 0,
+          BOOKED: value.BOOKED ?? 0,
+          FAILED: value.FAILED ?? 0,
+          CANCELLED: value.CANCELLED ?? 0
+        } as OrdersBucketSummary
+      }
       if (import.meta.env.DEV) {
         console.log('[fetchShipmentMetricsFromAPI] Orders bucket data:', ordersBucketData)
       }
@@ -547,20 +546,6 @@ function transformShipmentDataToTabData(
     return milestoneData[milestoneKey] !== undefined
   }
 
-  const getPriorityCountForBucket = (bucketKey: string): number | null => {
-    if (!selectedPriorities) {
-      return null
-    }
-
-    const analytics = analyticsMap?.get(bucketKey)
-    const prioritySummary = analytics?.priority_summary
-    if (!prioritySummary) {
-      return null
-    }
-
-    return selectedPriorities.reduce((sum, priority) => sum + (prioritySummary[priority] ?? 0), 0)
-  }
-
   // Calculate quick KPIs from shipment data
   const totalShipments = Object.values(milestoneData).reduce((sum, count) => sum + (count ?? 0), 0)
 
@@ -622,7 +607,7 @@ function transformShipmentDataToTabData(
         statusType: milestoneKey === 'EXCEPTIONS' || milestoneKey === 'UNDELIVERED' ? 'critical' : 'neutral',
         target: { path: `/shipments/${stageInfo.id}`, defaultFilters: {} },
         groupKey: 'summary',
-        groupLabel: null,
+        groupLabel: undefined,
         groupOrder: 0,
         isMissing: milestoneMissing
       })
@@ -791,4 +776,15 @@ function transformShipmentDataToTabData(
     quickKPIs,
     lifecycleStages: finalLifecycleStages
   }
+}
+
+const createMissingShipmentTabData = (globalFilters?: GlobalFilters): TabData => {
+  const emptyResponse = {
+    success: true,
+    data: {
+      milestone_summary: {}
+    }
+  } as ShipmentSummaryApiResponse
+
+  return transformShipmentDataToTabData(emptyResponse, undefined, null, 'Missing data', globalFilters)
 }

@@ -1,5 +1,5 @@
 import type { TabId, TabData, MetricData, LifecycleStage, GlobalFilters } from '../types/metrics'
-import { fetchJourneyMetrics } from './journeyApiService'
+import { fetchJourneyCounts, fetchJourneyMetrics } from './journeyApiService'
 import { fetchShipmentMetrics } from './shipmentsApiService'
 import { realApiService } from './realApiService'
 import { fetchOrdersBucketSummary } from './ordersApiService'
@@ -12,100 +12,6 @@ const ordersLifecycleStageConfig = [
   { id: 'invoicing', title: 'Invoicing', stageId: 'invoicing' },
   { id: 'failed', title: 'Failed', stageId: 'failed' },
 ]
-
-// Journey milestones for FTL orders (In Execution stage)
-const journeyMilestones = [
-  { key: 'PLANNED', label: 'Planned' },
-  { key: 'BEFORE_ORIGIN', label: 'Before Origin' },
-  { key: 'AT_ORIGIN', label: 'At Origin' },
-  { key: 'IN_TRANSIT', label: 'In Transit' },
-  { key: 'AT_DESTINATION', label: 'At Destination' },
-  { key: 'AFTER_DESTINATION', label: 'After Destination' },
-]
-
-// Shipment milestones for PTL orders (In Execution stage)
-const shipmentMilestones = [
-  { key: 'BOOKED', label: 'Booked' },
-  { key: 'PICKED_UP', label: 'Picked Up' },
-  { key: 'IN_TRANSIT', label: 'In Transit' },
-  { key: 'OUT_FOR_DELIVERY', label: 'Out for Delivery' },
-  { key: 'DELIVERED', label: 'Delivered' },
-]
-
-// Exception milestones separated by type
-const ftlExceptionMilestones = [
-  { key: 'CANCELLED', label: 'Journey Cancelled' },
-  { key: 'ROUTE_DEVIATION', label: 'Route Deviation' },
-  { key: 'VEHICLE_BREAKDOWN', label: 'Vehicle Breakdown' },
-  { key: 'OTHER_FTL', label: 'Other FTL Exceptions' },
-]
-
-const ptlExceptionMilestones = [
-  { key: 'DELIVERY_FAILED', label: 'Failed to Delivery' },
-  { key: 'RTO', label: 'RTO' },
-  { key: 'DAMAGED', label: 'Damaged' },
-  { key: 'OTHER_PTL', label: 'Other PTL Exceptions' },
-]
-
-const normalizeLabel = (value: string) => value.trim().toLowerCase()
-
-const getOrderType = (tripType: string): 'ftl' | 'ptl' | null => {
-  if (tripType === 'FTL') return 'ftl'
-  if (tripType === 'PTL') return 'ptl'
-  if (tripType === 'Outbound') return 'ftl' // Assuming Outbound is FTL
-  if (tripType === 'Inbound') return 'ptl' // Assuming Inbound is PTL
-  return null
-}
-
-const resolveOrderStageId = (stage: string, status: string): string => {
-  const normalizedStage = normalizeLabel(stage)
-  const normalizedStatus = normalizeLabel(status)
-  const lookup = `${normalizedStage} ${normalizedStatus}`
-
-  // Exception stages (priority check first)
-  if (lookup.includes('cancelled') || lookup.includes('failed') || lookup.includes('rto') || lookup.includes('return')) {
-    return 'exception'
-  }
-
-  // Invoicing stage
-  if (lookup.includes('reconciliation') || lookup.includes('invoice') || lookup.includes('billing') || lookup.includes('closed')) {
-    return 'invoicing'
-  }
-
-  // In Execution stage (active transport/delivery)
-  if (lookup.includes('transit') || lookup.includes('journey') || lookup.includes('picked') ||
-      lookup.includes('delivery') || lookup.includes('unloading') || lookup.includes('assignment') ||
-      lookup.includes('indent') || lookup.includes('vehicle') || lookup.includes('process') ||
-      lookup.includes('delivered')) {
-    return 'in_execution'
-  }
-
-  // Default to planning for new/pending orders
-  return 'planning'
-}
-
-const resolveMilestoneForOrder = (orderType: 'ftl' | 'ptl', stage: string, status: string): string => {
-  const normalizedStage = normalizeLabel(stage)
-  const normalizedStatus = normalizeLabel(status)
-  const lookup = `${normalizedStage} ${normalizedStatus}`
-
-  if (orderType === 'ftl') {
-    // Map to journey milestones
-    if (lookup.includes('destination') && lookup.includes('after')) return 'AFTER_DESTINATION'
-    if (lookup.includes('destination')) return 'AT_DESTINATION'
-    if (lookup.includes('transit')) return 'IN_TRANSIT'
-    if (lookup.includes('origin') && lookup.includes('at')) return 'AT_ORIGIN'
-    if (lookup.includes('origin') || lookup.includes('assignment')) return 'BEFORE_ORIGIN'
-    return 'PLANNED'
-  } else {
-    // Map to shipment milestones
-    if (lookup.includes('delivered')) return 'DELIVERED'
-    if (lookup.includes('delivery') || lookup.includes('unloading')) return 'OUT_FOR_DELIVERY'
-    if (lookup.includes('transit')) return 'IN_TRANSIT'
-    if (lookup.includes('picked')) return 'PICKED_UP'
-    return 'BOOKED'
-  }
-}
 
 // Build lifecycle stages using real API data
 const buildRealOrdersLifecycleStages = async (
@@ -121,12 +27,17 @@ const buildRealOrdersLifecycleStages = async (
     })
 
     let counts: Record<string, number | undefined> = {}
-    if (branchFteid === '__ALL__') {
-      const statusResponse = await realApiService.getOrderStatusCounts()
-      counts = statusResponse.data.counts
-    } else {
-      const statusResponse = await realApiService.getOrderStatusCounts(branchFteid)
-      counts = statusResponse.data.counts
+    try {
+      if (branchFteid === '__ALL__') {
+        const statusResponse = await realApiService.getOrderStatusCounts()
+        counts = statusResponse.data.counts
+      } else {
+        const statusResponse = await realApiService.getOrderStatusCounts(branchFteid)
+        counts = statusResponse.data.counts
+      }
+    } catch (error) {
+      console.warn('[buildRealOrdersLifecycleStages] Failed to fetch status counts, using missing counts:', error)
+      counts = {}
     }
 
     const bucketSummary = await bucketSummaryPromise
@@ -467,6 +378,55 @@ export const fetchTabMetrics = async (
   }
 
   throw new Error(`No real API implementation for tab: ${tab}`)
+}
+
+/**
+ * Fetch counts-only metrics for a tab (no journey search/list fetching).
+ */
+export const fetchTabCounts = async (
+  tab: TabId,
+  globalFilters: GlobalFilters
+): Promise<TabData> => {
+  if (tab === 'journeys') {
+    return fetchJourneyCounts(globalFilters)
+  }
+
+  if (tab === 'orders') {
+    const selectedBranch = globalFilters.locationId || undefined
+    const lifecycleStages = await buildRealOrdersLifecycleStages(
+      selectedBranch || '__ALL__',
+      globalFilters
+    )
+
+    const quickKPIs: MetricData[] = []
+    let totalOrders = 0
+    lifecycleStages.forEach(stage => {
+      stage.metrics.forEach(metric => {
+        totalOrders += metric.count
+      })
+    })
+
+    quickKPIs.push({
+      metricId: 'orders.total',
+      label: 'Total Orders',
+      count: totalOrders,
+      statusType: 'neutral',
+      target: { path: '/tms/orders', defaultFilters: {} },
+    })
+
+    return {
+      id: tab,
+      label: 'Orders',
+      quickKPIs,
+      lifecycleStages,
+    }
+  }
+
+  if (tab === 'shipments') {
+    return fetchShipmentMetrics(globalFilters)
+  }
+
+  throw new Error(`No counts-only implementation for tab: ${tab}`)
 }
 
 /**

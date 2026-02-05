@@ -375,12 +375,12 @@ function DetailsTab({ details, loading, error, onRetry }: DetailsTabProps) {
               {summary.status}
             </Badge>
             {delayMessage && (
-              <Badge variant="critical" size="sm">
+              <Badge variant="danger" size="sm">
                 {delayMessage}
               </Badge>
             )}
             {!delayMessage && summary.deliveryStatus === 'on_time' && (
-              <Badge variant="positive" size="sm">
+              <Badge variant="success" size="sm">
                 On time
               </Badge>
             )}
@@ -672,7 +672,7 @@ function TimelineTab({ timeline, loading, error, onRetry }: TimelineTabProps) {
                     </Typography>
                   )}
                   {event.delayMinutes && event.delayMinutes > 0 && (
-                    <Badge variant="critical" size="sm" style={{ marginTop: 'var(--spacing-x1)' }}>
+                    <Badge variant="danger" size="sm" style={{ marginTop: 'var(--spacing-x1)' }}>
                       {formatDelay(event.delayMinutes)}
                     </Badge>
                   )}

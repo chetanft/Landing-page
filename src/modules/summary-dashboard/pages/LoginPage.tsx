@@ -14,8 +14,7 @@ import {
   SegmentedTabItem,
   Divider,
   Alert,
-  Icon,
-  Logo
+  Icon
 } from 'ft-design-system'
 import { useAuth } from '../auth/AuthContext'
 import type { LoginCredentials } from '../auth/AuthContext'
@@ -27,6 +26,7 @@ import type { LoginCredentials } from '../auth/AuthContext'
 // - Google icon: 13062fc2-c406-4ddd-8549-63779e808e07
 // - Microsoft logo: 04ddcc59-4e7d-4aa6-b48e-228144fdee86
 // - Product showcase: 6ba08004-7545-4ac5-b376-0d7edaf671f7
+const imgFreightTigerLogo = '/assets/freight-tiger-logo.svg'
 const imgGoogleIcon = '/assets/google-icon.png'
 const imgMicrosoftLogo = '/assets/microsoft-logo.png'
 const imgImage5 = '/assets/product-showcase.png' // Main product image for slides
@@ -195,7 +195,16 @@ export default function LoginPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
           {/* Logo */}
           <div style={{ height: '45px', width: '237px', display: 'flex', alignItems: 'center' }}>
-            <Logo name="ft" style={{ height: '100%', width: '100%', objectFit: 'contain' }} />
+            <img 
+              src={imgFreightTigerLogo} 
+              alt="Freight Tiger" 
+              style={{ height: '100%', width: '100%', objectFit: 'contain' }}
+              onError={(e) => {
+                const target = e.target as HTMLImageElement
+                target.style.display = 'none'
+                console.warn(`Failed to load Freight Tiger logo: ${imgFreightTigerLogo}`)
+              }}
+            />
           </div>
 
           {/* Login Section */}
@@ -339,9 +348,14 @@ export default function LoginPage() {
             {/* Error Alert */}
             {error && (
               <Alert
-                message="Login Failed"
-                description={error}
-                type="error"
+                message={error}
+                {...({
+                  message: error,
+                  type: "warning",
+                  showIcon: true,
+                  closable: true,
+                  onClose: clearError
+                } as any)}
                 showIcon
                 closable
                 onClose={clearError}

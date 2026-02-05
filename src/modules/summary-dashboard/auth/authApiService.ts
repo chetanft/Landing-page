@@ -363,7 +363,14 @@ export class AuthApiService {
               const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
               const decoded = JSON.parse(atob(normalized))
               const ucv = decoded?.ucv || {}
-              userFteid = String(ucv.userFteid || ucv.fteid || decoded?.userFteid || decoded?.fteid || '')
+              userFteid = String(
+                ucv.userFteid
+                || ucv.fteid
+                || ucv.guid
+                || decoded?.userFteid
+                || decoded?.fteid
+                || ''
+              )
             }
           } catch {
             // Ignore decode errors; refresh will fail if userFteid is required.
@@ -372,15 +379,20 @@ export class AuthApiService {
       }
 
       const headers = this.getHeaders()
+      const accessToken = TokenManager.getAccessToken()
+      if (accessToken) {
+        headers['token'] = accessToken
+      }
       if (userFteid && isValidFtUserId(userFteid)) {
         headers['x-ft-userid'] = userFteid
       }
 
-      const response = await fetch(`${this.getBaseUrl()}/refresh`, {
+      const response = await fetch(buildAuthApiUrl('/api/authentication/v1/auth/refresh'), {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          refreshToken
+          refresh_token: refreshToken,
+          app_id: 'web'
         })
       })
 

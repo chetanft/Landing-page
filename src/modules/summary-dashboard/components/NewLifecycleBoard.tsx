@@ -3,11 +3,11 @@ import { Button, Icon, Typography } from 'ft-design-system'
 import type { IconName } from 'ft-design-system'
 import type { TabData, GlobalFilters, LifecycleStage } from '../types/metrics'
 import DashboardSkeleton from './DashboardSkeleton'
-import ErrorBanner from './ErrorBanner'
 import ProgressItem from './ProgressItem'
 import ExceptionItem from './ExceptionItem'
 import StatusItem from './StatusItem'
 import Tooltip from './Tooltip'
+import JourneyMapView from './JourneyMapView'
 
 interface NewLifecycleBoardProps {
   tabData: TabData | null
@@ -15,6 +15,7 @@ interface NewLifecycleBoardProps {
   error: string | null
   onRetry: () => void
   globalFilters: GlobalFilters
+  journeysViewMode?: 'column' | 'map'
 }
 
 interface SectionState {
@@ -268,11 +269,13 @@ function HeaderRow({
 function MilestonesRow({
   stages,
   globalFilters,
-  onRetry
+  onRetry,
+  suppressErrors = false
 }: {
   stages: LifecycleStage[]
   globalFilters: GlobalFilters
   onRetry: () => void
+  suppressErrors?: boolean
 }) {
   return (
     <div style={{ display: 'flex', borderBottom: thinBorder, alignItems: 'stretch' }}>
@@ -280,7 +283,7 @@ function MilestonesRow({
         const groups = groupMetrics(stage.metrics)
         const hasGroups = groups.length > 0
         const isGrouped = groups.length > 1 || (groups.length === 1 && groups[0].groupLabel !== null)
-        const hasError = Boolean(stage.error)
+        const hasError = Boolean(stage.error) && !suppressErrors
 
         return (
           <div
@@ -530,9 +533,10 @@ function StatusRow({
 export default function NewLifecycleBoard({
   tabData,
   isLoading,
-  error,
+  error: _error,
   onRetry,
   globalFilters,
+  journeysViewMode = 'column',
 }: NewLifecycleBoardProps) {
   const [sections, setSections] = useState<SectionState>(() => {
     const stored = localStorage.getItem('lifecycle-board-sections')
@@ -550,6 +554,8 @@ export default function NewLifecycleBoard({
     localStorage.setItem('lifecycle-board-sections', JSON.stringify(sections))
   }, [sections])
 
+  const isJourneysTab = tabData?.id === 'journeys'
+
   const toggleSection = (section: keyof SectionState) => {
     setSections(prev => ({
       ...prev,
@@ -559,10 +565,6 @@ export default function NewLifecycleBoard({
 
   if (isLoading && !tabData) {
     return <DashboardSkeleton />
-  }
-
-  if (error && !tabData) {
-    return <ErrorBanner message={error} onRetry={onRetry} />
   }
 
   if (!tabData) {
@@ -590,13 +592,23 @@ export default function NewLifecycleBoard({
     )
   }
 
+  // Show map view for journeys tab
+  if (isJourneysTab && journeysViewMode === 'map') {
+    return (
+      <div>
+        <JourneyMapView tabData={tabData} globalFilters={globalFilters} />
+      </div>
+    )
+  }
+
   return (
-    <div style={{
-      border: thinBorder,
-      borderRadius: 'var(--radius-md)',
-      overflow: 'hidden'
-    }}>
-      <div style={{ overflowX: 'auto' }}>
+    <div>
+      <div style={{
+        border: thinBorder,
+        borderRadius: 'var(--radius-md)',
+        overflow: 'hidden'
+      }}>
+        <div style={{ overflowX: 'auto' }}>
         {/* Stage Header */}
         <HeaderRow stages={lifecycleStages} />
 
@@ -606,6 +618,7 @@ export default function NewLifecycleBoard({
             stages={lifecycleStages}
             globalFilters={globalFilters}
             onRetry={onRetry}
+            suppressErrors={isJourneysTab}
           />
         )}
         <SectionToggle
@@ -647,15 +660,9 @@ export default function NewLifecycleBoard({
             />
           </>
         )}
+        </div>
       </div>
 
-      {error && (
-        <ErrorBanner
-          message={error}
-          onRetry={onRetry}
-          variant="inline"
-        />
-      )}
     </div>
   )
 }

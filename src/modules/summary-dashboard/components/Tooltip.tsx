@@ -7,9 +7,9 @@ interface TooltipProps {
   position?: 'top' | 'bottom' | 'left' | 'right'
 }
 
-export default function Tooltip({ content, children, position = 'top' }: TooltipProps) {
+export default function Tooltip({ content, children }: TooltipProps) {
   return (
-    <FTTooltip content={content} position={position}>
+    <FTTooltip content={content}>
       {children}
     </FTTooltip>
   )

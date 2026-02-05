@@ -119,11 +119,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   return (
     <Modal
       open={open}
-      onCancel={handleCancel}
-      footer={null}
-      width={480}
-      centered
-      maskClosable={false}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) handleCancel()
+      }}
+      style={{ width: 480 }}
     >
       <Card style={{ border: 'none', boxShadow: 'none' }}>
         <div style={{ textAlign: 'center', marginBottom: 'var(--spacing-x6)' }}>
@@ -145,13 +144,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               placeholder="Enter your username or email"
               value={formData.username}
               onChange={handleInputChange('username')}
-              error={!!formErrors.username}
+              error={formErrors.username || undefined}
               disabled={isLoading}
               autoFocus
             />
             {formErrors.username && (
               <Typography
-                variant="body-small-regular"
+                variant="body-secondary-regular"
                 style={{ color: 'var(--color-status-error)', marginTop: 'var(--spacing-x1)' }}
               >
                 {formErrors.username}
@@ -168,24 +167,24 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               placeholder="Enter your password"
               value={formData.password}
               onChange={handleInputChange('password')}
-              error={!!formErrors.password}
+              error={formErrors.password || undefined}
               disabled={isLoading}
             />
             <div style={{ textAlign: 'right', marginTop: 'var(--spacing-x1)' }}>
               <Button
-                type="link"
+                variant="link"
                 style={{ padding: 0, height: 'auto' }}
                 disabled={isLoading}
                 onClick={() => setShowPassword(prev => !prev)}
               >
-                <Typography variant="body-small-regular" style={{ color: 'var(--primary)' }}>
+                <Typography variant="body-secondary-regular" style={{ color: 'var(--primary)' }}>
                   {showPassword ? 'Hide password' : 'Show password'}
                 </Typography>
               </Button>
             </div>
             {formErrors.password && (
               <Typography
-                variant="body-small-regular"
+                variant="body-secondary-regular"
                 style={{ color: 'var(--color-status-error)', marginTop: 'var(--spacing-x1)' }}
               >
                 {formErrors.password}
@@ -196,19 +195,20 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           {error && (
             <div style={{ marginBottom: 'var(--spacing-x5)' }}>
               <Alert
-                message="Login Failed"
-                description={error}
-                type="error"
-                showIcon
-                closable
-                onClose={clearError}
+                {...({
+                  message: error,
+                  type: "warning",
+                  showIcon: true,
+                  closable: true,
+                  onClose: clearError
+                } as any)}
               />
             </div>
           )}
 
           <div style={{ marginBottom: 'var(--spacing-x5)', textAlign: 'right' }}>
             <Button
-              type="link"
+              variant="link"
               style={{ padding: 0, height: 'auto' }}
               disabled={isLoading}
               onClick={() => {
@@ -216,7 +216,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 console.log('Forgot password clicked')
               }}
             >
-              <Typography variant="body-small-regular" style={{ color: 'var(--primary)' }}>
+              <Typography variant="body-secondary-regular" style={{ color: 'var(--primary)' }}>
                 Forgot password?
               </Typography>
             </Button>
@@ -225,21 +225,21 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           <Row gutter={12}>
             <Col span={12}>
               <Button
-                block
-                type="default"
+                variant="secondary"
                 onClick={handleCancel}
                 disabled={isLoading}
+                style={{ width: '100%' }}
               >
                 Cancel
               </Button>
             </Col>
             <Col span={12}>
               <Button
-                block
-                type="primary"
-                htmlType="submit"
+                variant="primary"
+                type="submit"
                 loading={isLoading}
                 disabled={isLoading}
+                style={{ width: '100%' }}
               >
                 {isLoading ? 'Signing In...' : 'Sign In'}
               </Button>
@@ -247,10 +247,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           </Row>
         </form>
 
-        <Spacer size="large" />
+        <Spacer size={"large" as any} />
 
         <div style={{ textAlign: 'center' }}>
-          <Typography variant="body-small-regular" style={{ color: 'var(--color-text-tertiary)' }}>
+          <Typography variant="body-secondary-regular" style={{ color: 'var(--color-text-tertiary)' }}>
             By signing in, you agree to FreightTiger's Terms of Service and Privacy Policy
           </Typography>
         </div>
@@ -276,7 +276,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   onClearError
 }) => {
   const [formData, setFormData] = useState<LoginCredentials>({
-    email: '',
+    username: '',
     password: ''
   })
 
@@ -298,10 +298,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     <form onSubmit={handleSubmit}>
       <div style={{ marginBottom: 'var(--spacing-x4)' }}>
         <Input
-          type="email"
-          placeholder="Email"
-          value={formData.email}
-          onChange={handleInputChange('email')}
+          type="text"
+          placeholder="Username or Email"
+          value={formData.username}
+          onChange={handleInputChange('username')}
           disabled={isLoading}
           required
         />
@@ -321,21 +321,23 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       {error && (
         <div style={{ marginBottom: 'var(--spacing-x4)' }}>
           <Alert
-            message={error}
-            type="error"
-            showIcon
-            closable={!!onClearError}
-            onClose={onClearError}
+            {...({
+              message: error,
+              type: "warning",
+              showIcon: true,
+              closable: !!onClearError,
+              onClose: onClearError
+            } as any)}
           />
         </div>
       )}
 
       <Button
-        type="primary"
-        htmlType="submit"
+        variant="primary"
+        type="submit"
         loading={isLoading}
         disabled={isLoading}
-        block
+        style={{ width: '100%' }}
       >
         {isLoading ? 'Signing In...' : 'Sign In'}
       </Button>

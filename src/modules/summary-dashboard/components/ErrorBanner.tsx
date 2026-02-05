@@ -84,14 +84,16 @@ export default function ErrorBanner({
   if (variant === 'inline') {
     return (
       <Alert
-        type="warning"
-        message={description}
-        action={
-          <Button variant="text" size="sm" onClick={onRetry}>
-            Retry
-          </Button>
-        }
-        showIcon
+        {...({
+          type: "warning",
+          message: description,
+          action: (
+            <Button variant="text" size="sm" onClick={onRetry}>
+              Retry
+            </Button>
+          ),
+          showIcon: true
+        } as any)}
       />
     )
   }
@@ -101,11 +103,11 @@ export default function ErrorBanner({
       <Row justify="center" align="middle" style={{ minHeight: 'calc(var(--spacing-x24) * 3)' }}>
         <Col span={12} style={{ textAlign: 'center' }}>
           <Icon name="warning" size={48} />
-          <Spacer size="medium" />
+          <Spacer size={"medium" as any} />
           <Typography variant="title-secondary">{title}</Typography>
-          <Spacer size="small" />
+          <Spacer size={"small" as any} />
           <Typography variant="body-primary-regular">{description}</Typography>
-          <Spacer size="large" />
+          <Spacer size={"large" as any} />
           <Button variant="primary" size="md" onClick={onRetry}>
             Try Again
           </Button>

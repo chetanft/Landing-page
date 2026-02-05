@@ -1,5 +1,4 @@
-import React from 'react'
-import { Card, Icon, Typography, Divider, Collapsible, CollapsibleContent } from 'ft-design-system'
+import { Card, Icon, Typography, Divider } from 'ft-design-system'
 import type { LifecycleStage, GlobalFilters } from '../types/metrics'
 import ProgressItem from './ProgressItem'
 import ExceptionItem from './ExceptionItem'

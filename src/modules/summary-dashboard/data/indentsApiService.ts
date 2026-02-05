@@ -181,10 +181,10 @@ const fetchIndentPartners = async (path: string): Promise<IndentPartnerOption[]>
   }
 
   const items = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
-  return items.map((item: any) => ({
+  return items.map((item: { fteid?: string; id?: string; name?: string; label?: string; text?: string }): { value: string; label: string } => ({
     value: String(item.fteid || item.id || ''),
     label: String(item.name || item.label || item.text || '')
-  })).filter(item => item.value && item.label)
+  })).filter((item: { value: string; label: string }) => item.value && item.label)
 }
 
 export const fetchIndentConsignees = async (): Promise<IndentPartnerOption[]> => {

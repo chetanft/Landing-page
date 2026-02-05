@@ -2,15 +2,18 @@ import { Button, Icon, SegmentedTabs as FTSegmentedTabs, SegmentedTabItem, Quick
 import type { TabId, TabData } from '../types/metrics'
 
 export type ViewMode = 'grid' | 'table'
+export type JourneysViewMode = 'column' | 'map'
 export type PriorityFilter = 'high' | 'standard' | 'low'
 export type PrioritySelection = PriorityFilter[]
 
 interface TabControlsProps {
   activeTab: TabId
   viewMode?: ViewMode
+  journeysViewMode?: JourneysViewMode
   priorityFilter?: PrioritySelection
   tabData?: TabData | null
   onViewModeChange?: (mode: ViewMode) => void
+  onJourneysViewModeChange?: (mode: JourneysViewMode) => void
   onPriorityFilterChange?: (priority: PrioritySelection) => void
   onFilterClick?: () => void
 }
@@ -18,9 +21,11 @@ interface TabControlsProps {
 export default function TabControls({
   activeTab,
   viewMode = 'grid',
+  journeysViewMode = 'column',
   priorityFilter = [],
   tabData,
   onViewModeChange,
+  onJourneysViewModeChange,
   onPriorityFilterChange,
   onFilterClick,
 }: TabControlsProps) {
@@ -35,6 +40,12 @@ export default function TabControls({
   const handleViewModeChange = (value: string) => {
     if (onViewModeChange) {
       onViewModeChange(value as ViewMode)
+    }
+  }
+
+  const handleJourneysViewModeChange = (value: string) => {
+    if (onJourneysViewModeChange) {
+      onJourneysViewModeChange(value as JourneysViewMode)
     }
   }
 
@@ -152,7 +163,43 @@ export default function TabControls({
     )
   }
 
-  // Journeys and Invoices tabs: Filter button only
+  // Journeys tab: Filter button + Column/Map toggle
+  if (activeTab === 'journeys') {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-x2)' }}>
+        <Button
+          variant="text"
+          icon="filter"
+          iconPosition="only"
+          onClick={handleFilterClick}
+          style={{
+            height: 'var(--component-height-lg)',
+            width: 'var(--component-height-lg)',
+          }}
+        />
+        <FTSegmentedTabs
+          value={journeysViewMode}
+          onChange={handleJourneysViewModeChange}
+          style={{
+            backgroundColor: 'var(--bg-secondary)',
+            padding: 'var(--spacing-x1) var(--spacing-x2)',
+            borderRadius: 'var(--radius-lg)',
+            gap: 'var(--spacing-x1)',
+            height: 'var(--component-height-lg)',
+            width: 'fit-content',
+            justifyContent: 'center',
+            alignItems: 'center',
+            display: 'flex'
+          }}
+        >
+          <SegmentedTabItem value="column" label="Column" style={{ width: 'fit-content', paddingLeft: '8px', paddingRight: '8px' }} />
+          <SegmentedTabItem value="map" label="Map" style={{ width: 'fit-content', paddingLeft: '8px', paddingRight: '8px' }} />
+        </FTSegmentedTabs>
+      </div>
+    )
+  }
+
+  // Invoices tab: Filter button only
   return (
     <div style={{ display: 'flex', alignItems: 'center' }}>
       <Button

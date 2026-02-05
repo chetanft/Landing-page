@@ -121,7 +121,7 @@ function App() {
         node = document.createElement('div')
         node.setAttribute('data-select-position', JSON.stringify({ top: 0, left: 0, width: 0 }))
         node.setAttribute('data-select-position-global', 'true')
-        node.style.display = 'none'
+        ;(node as HTMLDivElement).style.display = 'none'
         document.body.prepend(node)
       }
       return node as HTMLDivElement

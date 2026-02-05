@@ -26,12 +26,18 @@
     "fetch:journey-snapshots": "node scripts/fetch-journey-snapshots.mjs"
   },
   "dependencies": {
+    "@deck.gl/aggregation-layers": "^9.2.6",
+    "@deck.gl/core": "^9.2.6",
+    "@deck.gl/layers": "^9.2.6",
+    "@deck.gl/react": "^9.2.6",
     "@tanstack/react-query": "^5.90.18",
     "crypto-js": "^4.2.0",
     "ft-design-system": "^4.19.5",
+    "maplibre-gl": "^4.7.1",
     "pg": "^8.11.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "react-map-gl": "^7.1.6",
     "react-router-dom": "^7.12.0"
   },
   "devDependencies": {

@@ -21,7 +21,7 @@ export const usePermissions = () => {
     return availableTabs.includes(tabId)
   }
 
-  const canAccessModule = (moduleId: string): boolean => {
+  const canAccessModule = (_moduleId: string): boolean => {
     return true
   }
 

@@ -26,7 +26,11 @@ export const resolveUserContext = (token?: string | null): UserContext | null =>
       const ucv = decoded?.ucv || {}
       const firstName = ucv.firstName ?? ucv.firstname
       const lastName = ucv.lastName ?? ucv.lastname
-      const userFteid = ucv.fteid ?? ucv.user_fteid ?? decoded.user_fteid ?? decoded.fteid
+      const userFteid = ucv.fteid
+        ?? ucv.user_fteid
+        ?? ucv.guid
+        ?? decoded.user_fteid
+        ?? decoded.fteid
       return {
         userId: String(ucv.id ?? decoded.sub ?? decoded.userId ?? 'unknown'),
         userFteid: userFteid ? String(userFteid) : undefined,
@@ -77,10 +81,34 @@ export const ftTmsFetch = async (pathOrUrl: string, options: RequestInit = {}): 
     Boolean(value && /^[A-Z]{3}-[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$/i.test(value))
 
   const applyAuthHeaders = (tokenValue: string | null) => {
-    const headers: Record<string, string> = {
+    const defaultHeaders: Record<string, string> = {
       'Accept': 'application/json',
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
+      'Content-Type': 'application/json'
+    }
+    
+    // Convert options.headers to Record<string, string> if it's a Headers object
+    let additionalHeaders: Record<string, string> = {}
+    if (options.headers) {
+      if (options.headers instanceof Headers) {
+        options.headers.forEach((value, key) => {
+          additionalHeaders[key] = value
+        })
+      } else if (Array.isArray(options.headers)) {
+        // Array of [key, value] pairs
+        options.headers.forEach(([key, value]) => {
+          if (typeof key === 'string' && typeof value === 'string') {
+            additionalHeaders[key] = value
+          }
+        })
+      } else {
+        // Assume it's a Record<string, string>
+        additionalHeaders = options.headers as Record<string, string>
+      }
+    }
+    
+    const headers: Record<string, string> = {
+      ...defaultHeaders,
+      ...additionalHeaders
     }
 
     if (tokenValue) {

@@ -2,7 +2,6 @@ import { buildFtTmsUrl, ftTmsFetch } from './ftTmsClient'
 import { realApiService } from './realApiService'
 import { TokenManager } from '../auth/tokenManager'
 import type {
-  OrdersListResponse,
   OrderDetailsResponse,
   OrderCommentsResponse,
   AddCommentRequest,
@@ -12,6 +11,7 @@ import type {
   PaginationMeta,
   OrderCustomData,
   CustomDataTemplateField,
+  OrderComment,
 } from '../types/orders'
 import type { GlobalFilters } from '../types/metrics'
 
@@ -29,13 +29,6 @@ interface OrdersBucketSummary {
 }
 
 type FilterId = 'inbound' | 'outbound' | 'ftl' | 'ptl' | 'delivery-delayed'
-
-const DEFAULT_MASTER_SEARCH_STATUSES = [
-  'UNPLANNED',
-  'PARTIALLY_PLANNED',
-  'PLANNED',
-  'DISPATCHED'
-]
 
 // Cache for custom data template (session-scoped)
 let customDataTemplateCache: CustomDataTemplateField[] | null = null
@@ -458,13 +451,6 @@ function buildRouteString(apiOrder: any): string {
   return ''
 }
 
-interface OrdersListParams {
-  page?: number
-  size?: number
-  'sort[sort_by]'?: string
-  'sort[sort_by_order]'?: string
-}
-
 /**
  * Extract orders payload from various response shapes
  */
@@ -517,26 +503,6 @@ function extractOrdersPayload(data: any): {
   return { orders, summary, pagination }
 }
 
-/**
- * Build query parameters for orders list API
- */
-function buildOrdersListParams(
-  filters: Set<FilterId>,
-  outboundOption: string | null,
-  globalFilters: GlobalFilters,
-  page: number = 1,
-  pageSize: number = 50
-): OrdersListParams {
-  const params: OrdersListParams = {
-    page,
-    size: pageSize,
-    'sort[sort_by]': 'created_at',
-    'sort[sort_by_order]': 'DESC',
-  }
-
-  return params
-}
-
 function buildOrdersMasterSearchPayload(
   filters: Set<FilterId>,
   globalFilters: GlobalFilters,
@@ -571,12 +537,12 @@ function buildOrdersMasterSearchPayload(
       {
         field: 'CREATED_AT',
         operator: '>=',
-        value: globalFilters.dateRange.start.getTime()
+        value: [String(globalFilters.dateRange.start.getTime())]
       },
       {
         field: 'CREATED_AT',
         operator: '<=',
-        value: globalFilters.dateRange.end.getTime()
+        value: [String(globalFilters.dateRange.end.getTime())]
       }
     )
   }
@@ -691,7 +657,7 @@ export async function fetchOrdersBucketSummary(
  */
 export async function fetchOrders(
   filters: Set<FilterId>,
-  outboundOption: string | null,
+  _outboundOption: string | null,
   globalFilters: GlobalFilters,
   page: number = 1,
   pageSize: number = 1000

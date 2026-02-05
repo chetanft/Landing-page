@@ -1,10 +1,10 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
-import { Typography, Row, Col, Spacer, Card, QuickFilters, QuickFilter, FilterOption, Loader } from 'ft-design-system'
+import { Typography, Row, Col, Spacer, Card, QuickFilters, QuickFilter, FilterOption } from 'ft-design-system'
 import type { TabId, GlobalFilters } from '../types/metrics'
 import AppHeader from '../components/AppHeader'
 import TitleBar from '../components/TitleBar'
 import SegmentedTabs from '../components/SegmentedTabs'
-import TabControls, { type ViewMode, type PriorityFilter, type PrioritySelection } from '../components/TabControls'
+import TabControls, { type ViewMode, type JourneysViewMode, type PrioritySelection } from '../components/TabControls'
 import NewLifecycleBoard from '../components/NewLifecycleBoard'
 import OrdersTableView from '../components/OrdersTableView'
 import FilterPane from '../components/FilterPane'
@@ -39,6 +39,10 @@ export default function SummaryDashboardPage() {
   const defaultTab = tabs[0]?.id || 'journeys'
   const [activeTab, setActiveTab] = useState<TabId>(defaultTab)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [journeysViewMode, setJourneysViewMode] = useState<JourneysViewMode>(() => {
+    const stored = localStorage.getItem('ftl-journey-view-mode')
+    return (stored === 'map' ? 'map' : 'column') as JourneysViewMode
+  })
   const [priorityFilter, setPriorityFilter] = useState<PrioritySelection>([])
   const [selectedFilters, setSelectedFilters] = useState<Set<'inbound' | 'outbound' | 'ftl' | 'ptl' | 'delivery-delayed'>>(new Set())
   const [selectedOutboundOption, setSelectedOutboundOption] = useState<string | null>(null)
@@ -57,19 +61,29 @@ export default function SummaryDashboardPage() {
     priority: defaultTab === 'shipments' ? priorityFilter : undefined
   })
 
-  const { tabData, isLoading, error, refetch } = useMetricsData(activeTab, globalFilters)
+  const {
+    tabData,
+    countsData,
+    isLoading,
+    countsLoading,
+    error,
+    refetch
+  } = useMetricsData(activeTab, globalFilters)
+
+  const displayTabData = tabData ?? countsData
+  const displayLoading = !displayTabData && (isLoading || countsLoading)
 
   useEffect(() => {
-    if (!hasInitialLoadCompleted && isLoading) {
+    if (!hasInitialLoadCompleted && displayLoading) {
       setAppLoading(true)
       return
     }
 
-    if (!hasInitialLoadCompleted && !isLoading) {
+    if (!hasInitialLoadCompleted && !displayLoading) {
       setHasInitialLoadCompleted(true)
       setAppLoading(false)
     }
-  }, [hasInitialLoadCompleted, isLoading, setAppLoading])
+  }, [hasInitialLoadCompleted, displayLoading, setAppLoading])
 
   // Fetch orders data for quick filter counts (only when orders tab is active)
   const { summary: ordersSummary } = useOrdersTableData({
@@ -101,6 +115,11 @@ export default function SummaryDashboardPage() {
     if (mode === 'table') {
       console.log('Table view selected - implementation pending design')
     }
+  }, [])
+
+  const handleJourneysViewModeChange = useCallback((mode: JourneysViewMode) => {
+    setJourneysViewMode(mode)
+    localStorage.setItem('ftl-journey-view-mode', mode)
   }, [])
 
   const handlePriorityFilterChange = useCallback((priority: PrioritySelection) => {
@@ -216,7 +235,7 @@ export default function SummaryDashboardPage() {
             <Col span={12}>
               <Card style={{ textAlign: 'center' }}>
                 <Typography variant="title-secondary">Access Restricted</Typography>
-                <Spacer size="small" />
+                <Spacer size={"small" as any} />
                 <Typography variant="body-primary-regular">You don't have permission to view the Summary Dashboard.</Typography>
                 <Typography variant="body-primary-regular">Please contact your administrator for access.</Typography>
               </Card>
@@ -250,7 +269,7 @@ export default function SummaryDashboardPage() {
         onClose={handleCloseDrawer}
       />
 
-      <div style={{ padding: 'var(--spacing-x6) var(--spacing-x5)' }}>
+      <div style={{ padding: 'var(--spacing-x6) var(--spacing-x5)', display: 'flex', flexDirection: 'column' }}>
         <Row align="middle" justify="center" style={{ marginBottom: 'var(--spacing-x6)', flexWrap: 'nowrap', width: '100%' }}>
           <Col style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', width: 'fit-content', gap: 'var(--spacing-x4)', flexWrap: 'nowrap', maxWidth: '327px' }}>
             <SegmentedTabs
@@ -298,9 +317,11 @@ export default function SummaryDashboardPage() {
             <TabControls
               activeTab={activeTab}
               viewMode={viewMode}
+              journeysViewMode={journeysViewMode}
               priorityFilter={priorityFilter}
               tabData={tabData}
               onViewModeChange={handleViewModeChange}
+              onJourneysViewModeChange={handleJourneysViewModeChange}
               onPriorityFilterChange={handlePriorityFilterChange}
               onFilterClick={handleFilterClick}
             />
@@ -319,11 +340,12 @@ export default function SummaryDashboardPage() {
               />
             ) : (
               <NewLifecycleBoard
-                tabData={tabData}
+                tabData={displayTabData}
                 globalFilters={globalFilters}
-                isLoading={isLoading}
-                error={error}
+                isLoading={displayLoading}
+                error={activeTab === 'journeys' ? null : error}
                 onRetry={handleRefresh}
+                journeysViewMode={journeysViewMode}
               />
             )}
           </Col>
