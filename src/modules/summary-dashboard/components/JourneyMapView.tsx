@@ -24,8 +24,7 @@ const DEFAULT_VIEW_STATE = {
 
 const FALLBACK_ON_TIME_COLOR: [number, number, number, number] = [34, 197, 94, 220]
 const FALLBACK_DELAYED_COLOR: [number, number, number, number] = [239, 68, 68, 220]
-const POINTS_MIN_ZOOM = 10
-
+const COUNTS_MAX_ZOOM = 8
 const parseCssColor = (value: string, fallback: [number, number, number, number]): [number, number, number, number] => {
   const trimmed = value.trim()
   if (!trimmed) return fallback
@@ -69,14 +68,14 @@ const resolveCssVarColor = (cssVar: string, fallback: [number, number, number, n
 }
 
 const getGridStep = (zoom: number): number => {
-  if (zoom < 6) return 2
-  if (zoom < 8) return 1
+  if (zoom < 5) return 2
+  if (zoom < 7) return 1
   return 0.5
 }
 
 const buildGridCounts = (points: JourneyMapPoint[], zoom: number) => {
   const step = getGridStep(zoom)
-  const buckets: Map<string, { lng: number; lat: number; count: number; delayedCount: number; sumLng: number; sumLat: number }> = new Map()
+  const buckets: Map<string, { lng: number; lat: number; count: number; sumLng: number; sumLat: number }> = new Map()
 
   points.forEach(point => {
     const bucketLng = Math.floor(point.lng / step) * step
@@ -87,13 +86,11 @@ const buildGridCounts = (points: JourneyMapPoint[], zoom: number) => {
       existing.count += 1
       existing.sumLng += point.lng
       existing.sumLat += point.lat
-      if (point.isDelayed) existing.delayedCount += 1
     } else {
       buckets.set(key, {
         lng: bucketLng + step / 2,
         lat: bucketLat + step / 2,
         count: 1,
-        delayedCount: point.isDelayed ? 1 : 0,
         sumLng: point.lng,
         sumLat: point.lat
       })
@@ -103,8 +100,7 @@ const buildGridCounts = (points: JourneyMapPoint[], zoom: number) => {
   return Array.from(buckets.values()).map(bucket => ({
     lng: bucket.sumLng / bucket.count,
     lat: bucket.sumLat / bucket.count,
-    count: bucket.count,
-    delayedCount: bucket.delayedCount
+    count: bucket.count
   }))
 }
 
@@ -124,7 +120,6 @@ export default function JourneyMapView({ tabData, globalFilters }: JourneyMapVie
     () => visiblePoints.filter(point => point.isDelayed),
     [visiblePoints]
   )
-  const showPoints = viewState.zoom >= POINTS_MIN_ZOOM
 
   useEffect(() => {
     const unsubscribe = subscribeToJourneySearchUpdates(() => {
@@ -144,64 +139,8 @@ export default function JourneyMapView({ tabData, globalFilters }: JourneyMapVie
     () => resolveCssVarColor('--text-inverse', [255, 255, 255, 255]),
     []
   )
-
   const layers = useMemo(() => {
     if (!visiblePoints.length) return []
-
-    const gridCounts = buildGridCounts(delayedPoints, viewState.zoom)
-
-    const countBadge = new ScatterplotLayer<{ lng: number; lat: number; count: number; delayedCount: number }>({
-      id: showPoints ? 'journey-count-badge-points' : 'journey-heatmap-count-badge',
-      data: gridCounts,
-      getPosition: d => [d.lng, d.lat],
-      getRadius: d => Math.min(22000, 9000 + d.count * 600),
-      radiusMinPixels: 14,
-      radiusMaxPixels: 26,
-      filled: true,
-      stroked: false,
-      getFillColor: () => delayedColor,
-      opacity: 0.95,
-      pickable: false
-    })
-
-
-    const countLabels = new TextLayer<{ lng: number; lat: number; count: number }>({
-      id: showPoints ? 'journey-counts-points' : 'journey-heatmap-counts',
-      data: gridCounts,
-      getPosition: d => [d.lng, d.lat],
-      getText: d => String(d.count),
-      getSize: 14,
-      sizeUnits: 'pixels',
-      getColor: labelColor,
-      fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif',
-      billboard: true,
-      getTextAnchor: 'middle',
-      getAlignmentBaseline: 'center',
-      characterSet: '0123456789',
-      pickable: false
-    })
-
-    if (showPoints) {
-      return [
-        new ScatterplotLayer<JourneyMapPoint>({
-          id: 'journey-scatter',
-          data: visiblePoints,
-          getPosition: d => [d.lng, d.lat],
-          getRadius: 7000,
-          radiusMinPixels: 4,
-          radiusMaxPixels: 10,
-          filled: true,
-          stroked: true,
-          getLineColor: [255, 255, 255],
-          lineWidthMinPixels: 1,
-          getFillColor: d => (d.isDelayed ? delayedColor : onTimeColor),
-          opacity: 0.85,
-          pickable: true
-        }),
-        countBadge,
-        countLabels
-      ]
-    }
 
     const heatmap = new HeatmapLayer<JourneyMapPoint>({
       id: 'journey-heatmap',
@@ -222,8 +161,59 @@ export default function JourneyMapView({ tabData, globalFilters }: JourneyMapVie
       opacity: 0.5
     })
 
-    return [heatmap, countBadge, countLabels]
-  }, [visiblePoints, delayedPoints, showPoints, viewState.zoom, onTimeColor, delayedColor, labelColor])
+    const points = new ScatterplotLayer<JourneyMapPoint>({
+      id: 'journey-scatter',
+      data: visiblePoints,
+      getPosition: d => [d.lng, d.lat],
+      getRadius: 7000,
+      radiusMinPixels: 4,
+      radiusMaxPixels: 10,
+      filled: true,
+      stroked: true,
+      getLineColor: [255, 255, 255],
+      lineWidthMinPixels: 1,
+      getFillColor: d => (d.isDelayed ? delayedColor : onTimeColor),
+      opacity: 0.85,
+      pickable: true
+    })
+
+    if (viewState.zoom > COUNTS_MAX_ZOOM) {
+      return [heatmap, points]
+    }
+
+    const gridCounts = buildGridCounts(delayedPoints, viewState.zoom)
+    const countBadge = new ScatterplotLayer<{ lng: number; lat: number; count: number }>({
+      id: 'journey-delayed-count-badge',
+      data: gridCounts,
+      getPosition: d => [d.lng, d.lat],
+      getRadius: d => Math.min(22000, 9000 + d.count * 600),
+      radiusMinPixels: 14,
+      radiusMaxPixels: 26,
+      filled: true,
+      stroked: false,
+      getFillColor: () => delayedColor,
+      opacity: 0.95,
+      pickable: false
+    })
+
+    const countLabels = new TextLayer<{ lng: number; lat: number; count: number }>({
+      id: 'journey-delayed-count-labels',
+      data: gridCounts,
+      getPosition: d => [d.lng, d.lat],
+      getText: d => String(d.count),
+      getSize: 14,
+      sizeUnits: 'pixels',
+      getColor: labelColor,
+      fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif',
+      billboard: true,
+      getTextAnchor: 'middle',
+      getAlignmentBaseline: 'center',
+      characterSet: '0123456789',
+      pickable: false
+    })
+
+    return [heatmap, points, countBadge, countLabels]
+  }, [visiblePoints, delayedPoints, viewState.zoom, onTimeColor, delayedColor, labelColor])
 
   if (visiblePoints.length === 0) {
     return (

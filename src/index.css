@@ -144,11 +144,11 @@ h1.font-sans.font-normal {
 /* Typography display-primary variant color override */
 /* Targets Typography components with display-primary variant and color="primary" */
 /* Changes color from rgb(67, 79, 100) to var(--primary) */
-/* Changes font-size from 24px to 32px */
+/* Changes font-size from 24px to 20px */
 /* Changes font-weight to 600 */
 div.font-sans.text-lg-rem.font-semibold {
   color: var(--primary) !important;
-  font-size: 32px !important;
+  font-size: 20px !important;
   font-weight: 600 !important;
 }
 
@@ -230,6 +230,14 @@ p.font-sans.text-sm-rem.font-normal[style*="font-size"][style*="var(--font-size-
 p.font-sans.text-sm-rem.font-normal[style*="fontSize"][style*="var(--font-size-sm)"][style*="italic"]:not([style*="color"]),
 p.font-sans.text-sm-rem.font-normal[style*="font-size"][style*="var(--font-size-sm)"][style*="italic"]:not([style*="color"]) {
   color: var(--color-tertiary) !important;
+}
+
+/* Typography heading-sm variant color override */
+/* Targets Typography components with heading-sm variant */
+/* Changes color from rgb(0, 0, 0) to var(--color-secondary) */
+/* This rule targets p elements with font-sans class that have width: 100% in style (matching "Transporter Wise Breakdown" heading) */
+p.font-sans[style*="width: 100%"] {
+  color: var(--color-secondary) !important;
 }
 
 /* FilterOption Typography color override - targets Typography with body-primary-regular variant */

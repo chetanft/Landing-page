@@ -1,5 +1,6 @@
 import { Card, Icon, Typography, Divider } from 'ft-design-system'
 import type { LifecycleStage, GlobalFilters } from '../types/metrics'
+import type { AlertOptionId } from '../data/useDelayedJourneysAnalytics'
 import ProgressItem from './ProgressItem'
 import ExceptionItem from './ExceptionItem'
 import StatusItem from './StatusItem'
@@ -9,6 +10,7 @@ interface NewLifecycleColumnProps {
   icon?: string
   globalFilters: GlobalFilters
   sectionStates: SectionState
+  onOpenDelayedDrawer?: (alert: AlertOptionId, count: number) => void
 }
 
 interface SectionState {
@@ -17,7 +19,7 @@ interface SectionState {
   exceptions: boolean
 }
 
-export default function NewLifecycleColumn({ stage, icon, globalFilters, sectionStates }: NewLifecycleColumnProps) {
+export default function NewLifecycleColumn({ stage, icon, globalFilters, sectionStates, onOpenDelayedDrawer }: NewLifecycleColumnProps) {
   // Filter out summary metrics (groupKey === 'summary') as they're redundant with the header
   const displayableMetrics = stage.metrics.filter(m => m.groupKey !== 'summary')
   
@@ -87,6 +89,7 @@ export default function NewLifecycleColumn({ stage, icon, globalFilters, section
                     <StatusItem
                       metric={metric}
                       globalFilters={globalFilters}
+                      onOpenDelayedDrawer={onOpenDelayedDrawer}
                     />
                   </div>
                 )
@@ -124,6 +127,7 @@ export default function NewLifecycleColumn({ stage, icon, globalFilters, section
                   key={`status-${index}`}
                   metric={status}
                   globalFilters={globalFilters}
+                  onOpenDelayedDrawer={onOpenDelayedDrawer}
                 />
               ))}
             </div>
@@ -149,6 +153,7 @@ export default function NewLifecycleColumn({ stage, icon, globalFilters, section
                   key={`exception-${index}`}
                   metric={exception}
                   globalFilters={globalFilters}
+                  onOpenDelayedDrawer={onOpenDelayedDrawer}
                 />
               ))}
             </div>

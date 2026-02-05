@@ -1,5 +1,7 @@
 import { buildFtTmsUrl, ftTmsFetch, resolveUserContext } from './ftTmsClient'
 import { TokenManager } from '../auth/tokenManager'
+import { AuthApiService } from '../auth/authApiService'
+import { ensureAuthReady } from '../auth/authGate'
 
 // Real API integration for FreightTiger TMS
 const normalizeBaseUrl = (baseUrl: string) => baseUrl.replace(/\/+$/, '')
@@ -20,6 +22,68 @@ const getPlanningBaseUrl = () => {
 type PlanningAuthPreference = 'auto' | 'desk' | 'login'
 
 const ORDERS_MASTER_SEARCH_PATH = '/orders/master-search'
+let deskTokenPromise: Promise<void> | null = null
+
+const ensureDeskTokenForPlanning = async (): Promise<void> => {
+  if (TokenManager.getDeskToken()) return
+  if (deskTokenPromise) return deskTokenPromise
+
+  deskTokenPromise = (async () => {
+    const loginToken = TokenManager.getAccessToken()
+    if (!loginToken) {
+      if (import.meta.env.DEV) {
+        console.warn('[ensureDeskTokenForPlanning] No login token available')
+      }
+      return
+    }
+
+    const desks = await AuthApiService.getDesks()
+    const firstDesk = desks?.[0]
+    if (!firstDesk?.fteid) {
+      if (import.meta.env.DEV) {
+        console.warn('[ensureDeskTokenForPlanning] No desks available for desk token')
+      }
+      return
+    }
+
+    const deskBranchCandidate =
+      (firstDesk as any).branch_fteid ||
+      (firstDesk as any).branchFteid ||
+      (firstDesk as any).branch_id ||
+      (firstDesk as any).branchId ||
+      firstDesk.parent_fteid ||
+      (firstDesk as any).parentFteid
+    const userContext = TokenManager.getUserContext()
+    if (userContext && isBranchFteid(deskBranchCandidate)) {
+      TokenManager.setUserContext({ ...userContext, branchId: String(deskBranchCandidate) })
+    }
+
+    const deskTokenResponse = await AuthApiService.getDeskToken(firstDesk.fteid)
+    if (deskTokenResponse?.auth_token) {
+      TokenManager.setDeskTokens({
+        accessToken: deskTokenResponse.auth_token,
+        refreshToken: deskTokenResponse.refresh_token,
+        expiresAt: Date.now() + (12 * 60 * 60 * 1000),
+        tokenType: 'Bearer'
+      })
+      if (import.meta.env.DEV) {
+        console.log('[ensureDeskTokenForPlanning] Stored desk token length:', deskTokenResponse.auth_token.length)
+      }
+    } else if (import.meta.env.DEV) {
+      console.warn('[ensureDeskTokenForPlanning] Desk token missing in response')
+    }
+  })()
+    .catch((error) => {
+      if (import.meta.env.DEV) {
+        console.warn('[ensureDeskTokenForPlanning] Failed to fetch desk token:', error)
+      }
+    })
+    .finally(() => {
+      deskTokenPromise = null
+    })
+
+  return deskTokenPromise
+}
 
 const selectPlanningToken = (path: string, preference: PlanningAuthPreference) => {
   const deskToken = TokenManager.getDeskToken()
@@ -60,6 +124,10 @@ const planningFetch = async (
   preference: PlanningAuthPreference = 'auto'
 ) => {
   const baseUrl = getPlanningBaseUrl()
+  const requiresDeskToken = preference === 'desk' || path.includes(ORDERS_MASTER_SEARCH_PATH)
+  if (requiresDeskToken && !TokenManager.getDeskToken()) {
+    await ensureDeskTokenForPlanning()
+  }
 
   const doFetch = async (baseUrl: string, token: string | null, source: string) => {
     const url = `${baseUrl}${path}`
@@ -438,6 +506,30 @@ export const realApiService = {
 
   // Orders Master Search
   async searchOrdersMaster(payload: OrdersMasterSearchRequest): Promise<OrdersMasterSearchResponse> {
+    // Gate on desk token - orders master search requires desk token
+    const authOk = await ensureAuthReady(true, 10000)
+    if (!authOk) {
+      if (import.meta.env.DEV) {
+        console.warn('[searchOrdersMaster] Auth not ready (desk token required), returning empty result')
+      }
+      // Return empty result structure instead of throwing
+      return {
+        success: true,
+        statusCode: 200,
+        data: {
+          data: [],
+          pagination: {
+            totalItems: 0,
+            totalPages: 0,
+            currentPage: payload.page,
+            pageSize: payload.size
+          }
+        },
+        message: 'Auth not ready',
+        timestamp: new Date().toISOString()
+      }
+    }
+
     const response = await planningFetch(ORDERS_MASTER_SEARCH_PATH, {
       method: 'POST',
       body: JSON.stringify(payload)

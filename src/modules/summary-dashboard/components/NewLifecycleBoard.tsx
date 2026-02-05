@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button, Icon, Typography } from 'ft-design-system'
 import type { IconName } from 'ft-design-system'
 import type { TabData, GlobalFilters, LifecycleStage } from '../types/metrics'
+import type { AlertOptionId } from '../data/useDelayedJourneysAnalytics'
 import DashboardSkeleton from './DashboardSkeleton'
 import ProgressItem from './ProgressItem'
 import ExceptionItem from './ExceptionItem'
@@ -16,6 +17,7 @@ interface NewLifecycleBoardProps {
   onRetry: () => void
   globalFilters: GlobalFilters
   journeysViewMode?: 'column' | 'map'
+  onOpenDelayedDrawer?: (alert: AlertOptionId, count: number) => void
 }
 
 interface SectionState {
@@ -270,12 +272,14 @@ function MilestonesRow({
   stages,
   globalFilters,
   onRetry,
-  suppressErrors = false
+  suppressErrors = false,
+  onOpenDelayedDrawer
 }: {
   stages: LifecycleStage[]
   globalFilters: GlobalFilters
   onRetry: () => void
   suppressErrors?: boolean
+  onOpenDelayedDrawer?: (alert: AlertOptionId, count: number) => void
 }) {
   return (
     <div style={{ display: 'flex', borderBottom: thinBorder, alignItems: 'stretch' }}>
@@ -366,6 +370,7 @@ function MilestonesRow({
                               <StatusItem
                                 metric={metric}
                                 globalFilters={globalFilters}
+                                onOpenDelayedDrawer={onOpenDelayedDrawer}
                               />
                             </div>
                           )
@@ -407,10 +412,12 @@ function MilestonesRow({
 // Exceptions Row - Grid row with consistent alignment
 function ExceptionsRow({
   stages,
-  globalFilters
+  globalFilters,
+  onOpenDelayedDrawer
 }: {
   stages: LifecycleStage[]
   globalFilters: GlobalFilters
+  onOpenDelayedDrawer?: (alert: AlertOptionId, count: number) => void
 }) {
   return (
     <div style={{ display: 'flex', borderBottom: thinBorder, alignItems: 'stretch' }}>
@@ -446,6 +453,7 @@ function ExceptionsRow({
                   key={`exception-${idx}`}
                   metric={exception}
                   globalFilters={globalFilters}
+                  onOpenDelayedDrawer={onOpenDelayedDrawer}
                 />
               ))}
             </div>
@@ -470,10 +478,12 @@ function ExceptionsRow({
 // Status Row - Grid row with consistent alignment
 function StatusRow({
   stages,
-  globalFilters
+  globalFilters,
+  onOpenDelayedDrawer
 }: {
   stages: LifecycleStage[]
   globalFilters: GlobalFilters
+  onOpenDelayedDrawer?: (alert: AlertOptionId, count: number) => void
 }) {
   return (
     <div style={{ display: 'flex', borderBottom: thinBorder, alignItems: 'stretch' }}>
@@ -509,6 +519,7 @@ function StatusRow({
                   key={`status-${idx}`}
                   metric={status}
                   globalFilters={globalFilters}
+                  onOpenDelayedDrawer={onOpenDelayedDrawer}
                 />
               ))}
             </div>
@@ -537,6 +548,7 @@ export default function NewLifecycleBoard({
   onRetry,
   globalFilters,
   journeysViewMode = 'column',
+  onOpenDelayedDrawer
 }: NewLifecycleBoardProps) {
   const [sections, setSections] = useState<SectionState>(() => {
     const stored = localStorage.getItem('lifecycle-board-sections')
@@ -619,6 +631,7 @@ export default function NewLifecycleBoard({
             globalFilters={globalFilters}
             onRetry={onRetry}
             suppressErrors={isJourneysTab}
+            onOpenDelayedDrawer={onOpenDelayedDrawer}
           />
         )}
         <SectionToggle
@@ -634,6 +647,7 @@ export default function NewLifecycleBoard({
               <ExceptionsRow
                 stages={lifecycleStages}
                 globalFilters={globalFilters}
+                onOpenDelayedDrawer={onOpenDelayedDrawer}
               />
             )}
             <SectionToggle
@@ -651,6 +665,7 @@ export default function NewLifecycleBoard({
               <StatusRow
                 stages={lifecycleStages}
                 globalFilters={globalFilters}
+                onOpenDelayedDrawer={onOpenDelayedDrawer}
               />
             )}
             <SectionToggle

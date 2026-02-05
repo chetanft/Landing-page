@@ -524,7 +524,7 @@ function buildOrdersMasterSearchPayload(
         operator: 'in',
         value: ['UNPLANNED', 'PARTIALLY_PLANNED', 'PLANNED', 'DISPATCHED'] // Match FT TMS app request
       }
-    ],
+    ] as Array<{ field: string; operator: string; value: string[] | number[] | string | number | null }>,
     includeDeletedOnly: false
   }
 
@@ -537,12 +537,12 @@ function buildOrdersMasterSearchPayload(
       {
         field: 'CREATED_AT',
         operator: '>=',
-        value: [String(globalFilters.dateRange.start.getTime())]
+        value: globalFilters.dateRange.start.getTime()
       },
       {
         field: 'CREATED_AT',
         operator: '<=',
-        value: [String(globalFilters.dateRange.end.getTime())]
+        value: globalFilters.dateRange.end.getTime()
       }
     )
   }
@@ -638,10 +638,20 @@ export async function fetchOrdersBucketSummary(
   const url = queryString ? `${baseUrl}?${queryString}` : baseUrl
 
   const response = await ftTmsFetch(url)
-  const data: OrdersBucketSummary = await response.json()
+  if (!response.ok) {
+    if (import.meta.env.DEV) {
+      console.warn('[fetchOrdersBucketSummary] Request failed:', response.status, response.statusText)
+    }
+    return null
+  }
+
+  const data: OrdersBucketSummary = await response.json().catch(() => ({ success: false } as OrdersBucketSummary))
 
   if (!data.success) {
-    throw new Error('API returned failure status')
+    if (import.meta.env.DEV) {
+      console.warn('[fetchOrdersBucketSummary] API returned failure status')
+    }
+    return null
   }
 
   if (import.meta.env.DEV) {

@@ -117,7 +117,7 @@ export default function FilterPane({
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(0, 0, 0, 0.3)',
-          zIndex: 1000,
+          zIndex: 10050,
           opacity: 1,
           transition: 'opacity 0.2s ease-in-out',
         }}
@@ -135,7 +135,7 @@ export default function FilterPane({
           backgroundColor: 'var(--bg-primary)',
           borderRadius: 'var(--radius-lg)',
           boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
-          zIndex: 1001,
+          zIndex: 10051,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',

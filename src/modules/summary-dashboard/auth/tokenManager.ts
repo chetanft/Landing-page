@@ -20,6 +20,20 @@ export interface UserContext {
   permissions?: string[]
 }
 
+/**
+ * Validate that a token string is not invalid
+ * Rejects: undefined, null, 'undefined', 'null', empty string, whitespace-only
+ */
+const isValidTokenString = (token: string | null | undefined): token is string => {
+  if (!token) return false
+  const trimmed = token.trim()
+  if (trimmed === '') return false
+  if (trimmed === 'undefined') return false
+  if (trimmed === 'null') return false
+  if (trimmed.length < 10) return false // JWT tokens are typically much longer
+  return true
+}
+
 export class TokenManager {
   private static readonly ACCESS_TOKEN_KEY = 'ft_access_token'
   private static readonly REFRESH_TOKEN_KEY = 'ft_refresh_token'
@@ -30,13 +44,21 @@ export class TokenManager {
 
   /**
    * Get stored access token
+   * Returns null if token is invalid (undefined, null string, empty, etc.)
    */
   static getAccessToken(): string | null {
     try {
-      return (
-        localStorage.getItem('ft_login_token') ||
+      const token = localStorage.getItem('ft_login_token') ||
         localStorage.getItem(this.ACCESS_TOKEN_KEY)
-      )
+
+      // Validate token before returning
+      if (!isValidTokenString(token)) {
+        if (token && import.meta.env.DEV) {
+          console.warn('[TokenManager] Invalid access token detected:', String(token).substring(0, 20))
+        }
+        return null
+      }
+      return token
     } catch (error) {
       console.warn('Error accessing localStorage for token:', error)
       return null
@@ -45,10 +67,20 @@ export class TokenManager {
 
   /**
    * Get stored desk access token (used for indent API in FT app)
+   * Returns null if token is invalid (undefined, null string, empty, etc.)
    */
   static getDeskToken(): string | null {
     try {
-      return localStorage.getItem(this.DESK_TOKEN_KEY)
+      const token = localStorage.getItem(this.DESK_TOKEN_KEY)
+
+      // Validate token before returning
+      if (!isValidTokenString(token)) {
+        if (token && import.meta.env.DEV) {
+          console.warn('[TokenManager] Invalid desk token detected:', String(token).substring(0, 20))
+        }
+        return null
+      }
+      return token
     } catch (error) {
       console.warn('Error accessing localStorage for desk token:', error)
       return null
@@ -57,10 +89,17 @@ export class TokenManager {
 
   /**
    * Get stored desk refresh token
+   * Returns null if token is invalid (undefined, null string, empty, etc.)
    */
   static getDeskRefreshToken(): string | null {
     try {
-      return localStorage.getItem(this.DESK_REFRESH_TOKEN_KEY)
+      const token = localStorage.getItem(this.DESK_REFRESH_TOKEN_KEY)
+
+      // Validate token before returning
+      if (!isValidTokenString(token)) {
+        return null
+      }
+      return token
     } catch (error) {
       console.warn('Error accessing localStorage for desk refresh token:', error)
       return null
@@ -69,10 +108,17 @@ export class TokenManager {
 
   /**
    * Get stored refresh token
+   * Returns null if token is invalid (undefined, null string, empty, etc.)
    */
   static getRefreshToken(): string | null {
     try {
-      return localStorage.getItem(this.REFRESH_TOKEN_KEY)
+      const token = localStorage.getItem(this.REFRESH_TOKEN_KEY)
+
+      // Validate token before returning
+      if (!isValidTokenString(token)) {
+        return null
+      }
+      return token
     } catch (error) {
       console.warn('Error accessing localStorage for refresh token:', error)
       return null
@@ -81,8 +127,17 @@ export class TokenManager {
 
   /**
    * Store authentication tokens
+   * Validates tokens before storing - refuses to store invalid tokens
    */
   static setTokens(tokens: AuthTokens): void {
+    // Validate access token before storing
+    if (!isValidTokenString(tokens.accessToken)) {
+      if (import.meta.env.DEV) {
+        console.error('[TokenManager] Refusing to store invalid access token:', tokens.accessToken ? String(tokens.accessToken).substring(0, 20) : 'null/undefined')
+      }
+      throw new Error('Attempted to store invalid access token')
+    }
+
     try {
       // Store in standard keys
       localStorage.setItem(this.ACCESS_TOKEN_KEY, tokens.accessToken)
@@ -90,11 +145,12 @@ export class TokenManager {
 
       // Also store in ft_login_token for compatibility with existing code
       localStorage.setItem('ft_login_token', tokens.accessToken)
-      
+
       // Store expiry timestamp for ft_login_token compatibility
       localStorage.setItem('ft_token_expiry', tokens.expiresAt.toString())
 
-      if (tokens.refreshToken) {
+      // Only store refresh token if valid
+      if (tokens.refreshToken && isValidTokenString(tokens.refreshToken)) {
         localStorage.setItem(this.REFRESH_TOKEN_KEY, tokens.refreshToken)
       }
     } catch (error) {
@@ -105,11 +161,21 @@ export class TokenManager {
 
   /**
    * Store desk tokens (used for indent API in FT app)
+   * Validates tokens before storing - refuses to store invalid tokens
    */
   static setDeskTokens(tokens: AuthTokens): void {
+    // Validate desk access token before storing
+    if (!isValidTokenString(tokens.accessToken)) {
+      if (import.meta.env.DEV) {
+        console.error('[TokenManager] Refusing to store invalid desk token:', tokens.accessToken ? String(tokens.accessToken).substring(0, 20) : 'null/undefined')
+      }
+      throw new Error('Attempted to store invalid desk token')
+    }
+
     try {
       localStorage.setItem(this.DESK_TOKEN_KEY, tokens.accessToken)
-      if (tokens.refreshToken) {
+      // Only store refresh token if valid
+      if (tokens.refreshToken && isValidTokenString(tokens.refreshToken)) {
         localStorage.setItem(this.DESK_REFRESH_TOKEN_KEY, tokens.refreshToken)
       }
     } catch (error) {

@@ -1,10 +1,11 @@
 import type { TabData, MetricData, LifecycleStage, GlobalFilters } from '../types/metrics'
 import { ApiError } from '../utils/apiUtils'
-import { AuthenticationError } from '../auth/authApiService'
+import { AuthApiService, AuthenticationError } from '../auth/authApiService'
 import { fetchIndentsCount } from './indentsApiService'
 import { MODULE_URLS } from '../config/moduleNavigation'
-import { buildFtTmsUrl, ftTmsFetch } from './ftTmsClient'
+import { buildFtTmsUrl, ftTmsFetch, resolveUserContext } from './ftTmsClient'
 import { TokenManager } from '../auth/tokenManager'
+import { ensureAuthReady } from '../auth/authGate'
 
 // API response types based on the provided structure
 interface JourneyApiMilestone {
@@ -411,9 +412,57 @@ const fetchJourneyLoads = async (
     return journeyLoadsCache.get(journeyFteid)?.data?.loads ?? null
   }
 
+  // Gate on desk token - loads API requires desk token
+  const authOk = await ensureAuthReady(true, 5000)
+  if (!authOk) {
+    // If desk token unavailable, return null and don't fetch
+    if (import.meta.env.DEV) {
+      console.warn('[fetchJourneyLoads] Auth not ready (desk token required), skipping fetch')
+    }
+    return null
+  }
+
   const url = buildJourneyDetailsUrl(journeyFteid, 'details/loads', globalFilters)
   try {
-    const response = await ftTmsFetch(url, { method: 'GET' })
+    const accessToken = TokenManager.getAccessToken()
+    const initialToken = TokenManager.getDeskToken() || accessToken
+    if (!initialToken) {
+      throw new AuthenticationError('No token available for journey loads request')
+    }
+
+    let response = await fetch(url, { method: 'GET', headers: buildJourneyRequestHeaders(initialToken) })
+
+    if ((response.status === 401 || response.status === 403) && initialToken === accessToken) {
+      const desks = await AuthApiService.getDesks().catch(() => [])
+      const firstDesk = desks?.[0]
+      if (firstDesk?.fteid) {
+        const deskTokenResponse = await AuthApiService.getDeskToken(firstDesk.fteid)
+        if (deskTokenResponse?.auth_token) {
+          TokenManager.setDeskTokens({
+            accessToken: deskTokenResponse.auth_token,
+            refreshToken: deskTokenResponse.refresh_token,
+            expiresAt: Date.now() + (12 * 60 * 60 * 1000)
+          })
+          response = await fetch(url, { method: 'GET', headers: buildJourneyRequestHeaders(deskTokenResponse.auth_token) })
+        }
+      }
+    }
+
+    if (response.status === 401 && TokenManager.hasDeskRefreshToken() && TokenManager.getDeskToken()) {
+      const refreshed = await AuthApiService.refreshDeskToken(
+        TokenManager.getDeskRefreshToken()!,
+        TokenManager.getDeskToken()!
+      )
+      if (refreshed?.auth_token) {
+        TokenManager.setDeskTokens({
+          accessToken: refreshed.auth_token,
+          refreshToken: refreshed.refresh_token,
+          expiresAt: Date.now() + (12 * 60 * 60 * 1000)
+        })
+        response = await fetch(url, { method: 'GET', headers: buildJourneyRequestHeaders(refreshed.auth_token) })
+      }
+    }
+
     const data: JourneyLoadsResponse = await response.json()
     if (data?.success) {
       journeyLoadsCache.set(journeyFteid, data)
@@ -428,23 +477,27 @@ const fetchJourneyLoads = async (
   return null
 }
 
-const buildJourneyRequestHeaders = (): Record<string, string> => {
-  const token = TokenManager.getAccessToken()
-  if (!token) {
-    throw new AuthenticationError('No access token available for journey snapshot')
-  }
-
+const buildJourneyRequestHeaders = (token: string): Record<string, string> => {
   const headers: Record<string, string> = {
     'Accept': 'application/json',
-    'Authorization': `Bearer ${token}`
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+    'token': token
   }
 
-  const userContext = TokenManager.getUserContext()
+  const userContext = resolveUserContext(token) ?? TokenManager.getUserContext()
   if (userContext?.orgId) {
     headers['X-FT-ORGID'] = userContext.orgId
+    headers['X-Org-Id'] = userContext.orgId
+  }
+  if (userContext?.userFteid) {
+    headers['X-FT-USERID'] = userContext.userFteid
   }
   if (userContext?.userId) {
-    headers['X-FT-USERID'] = userContext.userId
+    headers['X-User-Id'] = userContext.userId
+  }
+  if (userContext?.userRole) {
+    headers['X-User-Role'] = userContext.userRole
   }
 
   return headers
@@ -494,7 +547,14 @@ const fetchJourneySearchPage = async (
   page: number,
   signal?: AbortSignal
 ): Promise<JourneySearchResponse | null> => {
-  const headers = buildJourneyRequestHeaders()
+  const token = TokenManager.getDeskToken() || TokenManager.getAccessToken()
+  if (!token) {
+    if (import.meta.env.DEV) {
+      console.warn('[fetchJourneySearchPage] No token available')
+    }
+    return null
+  }
+  const headers = buildJourneyRequestHeaders(token)
   const url = buildJourneySearchUrl(globalFilters, journeyStatus, page, JOURNEY_SEARCH_PAGE_SIZE)
   const response = await fetch(url, {
     method: 'GET',
@@ -577,8 +637,26 @@ const fetchJourneySearchSummary = async (
   }
 }
 
+export const ensureJourneySearchData = async (globalFilters: GlobalFilters): Promise<void> => {
+  await runWithConcurrency(JOURNEY_STATUSES_FOR_ALERTS, JOURNEY_SEARCH_STATUS_CONCURRENCY, async (status) => {
+    await fetchJourneySearchSummary(globalFilters, status)
+  })
+}
+
+export const getAllJourneySearchItems = (): JourneySearchItem[] => {
+  const byId = new Map<string, JourneySearchItem>()
+  for (const journeys of journeySearchCache.values()) {
+    journeys.forEach((journey) => {
+      const key = journey.journey_fteid ? String(journey.journey_fteid) : ''
+      if (!key) return
+      byId.set(key, journey)
+    })
+  }
+  return Array.from(byId.values())
+}
+
 const applyJourneySearchSummaries = (tabData: TabData, summaries: JourneySearchSummary[]): TabData => {
-  const validSummaries = summaries.filter(summary => summary && summary.isComplete)
+  const validSummaries = summaries.filter(summary => summary)
   if (validSummaries.length === 0) return tabData
 
   const summaryByStatus = new Map<JourneyMilestoneKey, JourneySearchSummary>()
@@ -586,32 +664,12 @@ const applyJourneySearchSummaries = (tabData: TabData, summaries: JourneySearchS
     summaryByStatus.set(summary.status, summary)
   })
 
-  const deliveredTotal = (summaryByStatus.get('AFTER_DESTINATION')?.total ?? 0)
-    + (summaryByStatus.get('CLOSED')?.total ?? 0)
-  const hasDeliveredTotal = summaryByStatus.has('AFTER_DESTINATION') || summaryByStatus.has('CLOSED')
-
   const updatedStages = tabData.lifecycleStages.map(stage => {
     const metrics = [...stage.metrics]
     const status = [...(stage.status ?? [])]
 
-    const updateSummaryCount = (count: number, hasValue: boolean) => {
-      const index = metrics.findIndex(item => item.groupKey === 'summary')
-      if (index >= 0 && hasValue) {
-        metrics[index] = { ...metrics[index], count, isMissing: false }
-      }
-    }
-
-    if (stage.id === 'en-route-loading') {
-      const summary = summaryByStatus.get('BEFORE_ORIGIN')
-      if (summary) updateSummaryCount(summary.total, true)
-    }
-    if (stage.id === 'at-loading') {
-      const summary = summaryByStatus.get('AT_ORIGIN')
-      if (summary) updateSummaryCount(summary.total, true)
-    }
     if (stage.id === 'in-transit') {
       const summary = summaryByStatus.get('IN_TRANSIT')
-      if (summary) updateSummaryCount(summary.total, true)
       if (summary) {
         const updateMetric = (metricId: string, count: number) => {
           const index = status.findIndex(item => item.metricId === metricId)
@@ -623,17 +681,6 @@ const applyJourneySearchSummaries = (tabData: TabData, summaries: JourneySearchS
         updateMetric('in-transit-at-pickup', summary.atPickup)
         updateMetric('in-transit-at-drop-pickup', summary.atDropPickup)
       }
-    }
-    if (stage.id === 'at-destination') {
-      const summary = summaryByStatus.get('AT_DESTINATION')
-      if (summary) updateSummaryCount(summary.total, true)
-    }
-    if (stage.id === 'return-journey') {
-      const summary = summaryByStatus.get('IN_RETURN')
-      if (summary) updateSummaryCount(summary.total, true)
-    }
-    if (stage.id === 'delivered') {
-      updateSummaryCount(deliveredTotal, hasDeliveredTotal)
     }
 
     return { ...stage, metrics, status }
@@ -690,7 +737,11 @@ const prefetchJourneyDetails = async (
 
 const fetchJourneyStatusCounts = async (globalFilters: GlobalFilters, journeyStatus: JourneyMilestoneKey): Promise<JourneyApiResponse> => {
   const url = buildJourneySnapshotUrl(globalFilters, journeyStatus)
-  const headers = buildJourneyRequestHeaders()
+  const token = TokenManager.getDeskToken() || TokenManager.getAccessToken()
+  if (!token) {
+    throw new ApiError('No token available for journey status counts', 401, 'Unauthorized', url)
+  }
+  const headers = buildJourneyRequestHeaders(token)
 
   const response = await fetch(url, {
     method: 'GET',
@@ -748,6 +799,7 @@ export const fetchJourneyAlerts = async (
     const data = await response.json()
     if (data?.success) {
       journeyAlertsCache.set(journeyFteid, data.data)
+      notifyJourneySearchUpdate()
       return data.data
     }
   } catch (error) {
@@ -756,6 +808,10 @@ export const fetchJourneyAlerts = async (
     }
   }
   return null
+}
+
+export const getJourneyAlertsForJourney = (journeyFteid: string): any | null => {
+  return journeyAlertsCache.get(journeyFteid) ?? null
 }
 
 export const fetchJourneyTrackingPath = async (
@@ -809,6 +865,15 @@ export const fetchJourneyPodSummary = async (
  * Fetch base journey counts (no ePOD/indents) – used by multiple queries
  */
 export const fetchJourneyCounts = async (globalFilters: GlobalFilters): Promise<TabData> => {
+  // Gate on auth readiness - journey API requires login token
+  const authOk = await ensureAuthReady(false, 10000)
+  if (!authOk) {
+    if (import.meta.env.DEV) {
+      console.warn('[fetchJourneyCounts] Auth not ready, returning missing data')
+    }
+    return createMissingJourneyTabData()
+  }
+
   const cacheKey = buildJourneyCountsKey(globalFilters)
   const now = Date.now()
   if (journeyCountsCache && journeyCountsCache.key === cacheKey && now - journeyCountsCache.timestamp < JOURNEY_COUNTS_CACHE_TTL) {
@@ -831,6 +896,15 @@ export const fetchJourneyCounts = async (globalFilters: GlobalFilters): Promise<
  * Fetch journey metrics from the real API with enhanced error handling
  */
 export const fetchJourneyMetrics = async (globalFilters: GlobalFilters): Promise<TabData> => {
+  // Gate on auth readiness - journey API requires login token
+  const authOk = await ensureAuthReady(false, 10000)
+  if (!authOk) {
+    if (import.meta.env.DEV) {
+      console.warn('[fetchJourneyMetrics] Auth not ready, returning missing data')
+    }
+    return createMissingJourneyTabData()
+  }
+
   // Always fetch both journey data and indents data in parallel
   const [epodSummaryResult, journeyData, indentsData, searchSummaries] = await Promise.all([
     fetchJourneyEpodSummary(),
@@ -856,6 +930,15 @@ export const fetchJourneyMetrics = async (globalFilters: GlobalFilters): Promise
  * Fetch journey counts (no search/list calls) to render counts quickly.
  */
 export const fetchJourneyCountsOnly = async (globalFilters: GlobalFilters): Promise<TabData> => {
+  // Gate on auth readiness - journey API requires login token
+  const authOk = await ensureAuthReady(false, 10000)
+  if (!authOk) {
+    if (import.meta.env.DEV) {
+      console.warn('[fetchJourneyCountsOnly] Auth not ready, returning missing data')
+    }
+    return createMissingJourneyTabData()
+  }
+
   const [epodResult, journeyResult, indentsResult] = await Promise.allSettled([
     fetchJourneyEpodSummary(),
     fetchJourneyCounts(globalFilters),
@@ -1592,27 +1675,26 @@ export function getJourneyMapPoints(_globalFilters: GlobalFilters): JourneyMapPo
   return mapPoints
 }
 
-const getJourneyStageLabel = (status: JourneyMilestoneKey): string => {
+const getMilestoneLabel = (status: JourneyMilestoneKey): string => {
   const mapping: Record<JourneyMilestoneKey, string> = {
-    PLANNED: 'Vehicle procurement',
     BEFORE_ORIGIN: 'En route to loading',
-    AT_ORIGIN: 'At Loading',
-    IN_TRANSIT: 'In Transit',
-    AT_DESTINATION: 'At Destination',
-    IN_RETURN: 'In Return',
+    AT_ORIGIN: 'At origin',
+    IN_TRANSIT: 'In transit',
+    AT_DESTINATION: 'At destination',
     AFTER_DESTINATION: 'Delivered',
-    CLOSED: 'Delivered'
+    CLOSED: 'Delivered',
+    PLANNED: 'Planning',
+    IN_RETURN: 'In return'
   }
-  return mapping[status] ?? 'In Transit'
+  return mapping[status] ?? 'Tracking'
 }
 
-const getOrderStage = (status: JourneyMilestoneKey): string => {
+const getStageForStatus = (status: JourneyMilestoneKey): 'Tracking' | 'Delivered' | 'Vehicle procurement' | 'Planning' => {
+  if (status === 'AFTER_DESTINATION' || status === 'CLOSED') return 'Delivered'
   if (['BEFORE_ORIGIN', 'AT_ORIGIN', 'IN_TRANSIT', 'AT_DESTINATION'].includes(status)) {
-    return 'In execution'
+    return 'Tracking'
   }
-  if (['AFTER_DESTINATION', 'CLOSED'].includes(status)) {
-    return 'Delivered'
-  }
+  if (status === 'PLANNED') return 'Vehicle procurement'
   return 'Planning'
 }
 
@@ -1620,8 +1702,8 @@ export const getJourneyDoRows = (): JourneyDoRow[] => {
   const rows: JourneyDoRow[] = []
 
   for (const [status, journeys] of journeySearchCache.entries()) {
-    const milestoneLabel = getJourneyStageLabel(status)
-    const stageLabel = getOrderStage(status)
+    const milestoneLabel = getMilestoneLabel(status)
+    const stageLabel = getStageForStatus(status)
     journeys.forEach((journey) => {
       const journeyId = journey.journey_fteid
       if (!journeyId) return
@@ -1635,6 +1717,10 @@ export const getJourneyDoRows = (): JourneyDoRow[] => {
         const consignorName = load.from?.label || ''
         const consigneeName = load.to?.label || ''
         const statusLabel = load.status || journey.journey_status || ''
+        const epodStatus = typeof journey.epod_status === 'string' ? journey.epod_status : ''
+        const finalStatus = stageLabel === 'Delivered' && epodStatus
+          ? epodStatus
+          : statusLabel
 
         const invoices = load.invoices ?? []
         invoices.forEach((invoice) => {
@@ -1660,7 +1746,7 @@ export const getJourneyDoRows = (): JourneyDoRow[] => {
               tripType: 'FTL',
               stage: stageLabel,
               milestone: milestoneLabel,
-              status: statusLabel,
+              status: finalStatus,
               relatedIdType: 'Trip',
               relatedId: journeyId,
               deliveryStatus: '',

@@ -6,10 +6,12 @@ import TitleBar from '../components/TitleBar'
 import SegmentedTabs from '../components/SegmentedTabs'
 import TabControls, { type ViewMode, type JourneysViewMode, type PrioritySelection } from '../components/TabControls'
 import NewLifecycleBoard from '../components/NewLifecycleBoard'
+import DelayedInsightsDrawer from '../components/DelayedInsightsDrawer'
 import OrdersTableView from '../components/OrdersTableView'
 import FilterPane from '../components/FilterPane'
 import OrderDetailsDrawer from '../components/OrderDetailsDrawer'
 import { useMetricsData } from '../data/useMetricsData'
+import { useDelayedJourneysAnalytics, type AlertOptionId } from '../data/useDelayedJourneysAnalytics'
 import { usePermissions } from '../hooks/usePermissions'
 import { useOrdersTableData } from '../hooks/useOrdersTableData'
 import { useAppLoader } from '../../../AppLoaderContext'
@@ -49,6 +51,9 @@ export default function SummaryDashboardPage() {
   const [isFilterPaneOpen, setIsFilterPaneOpen] = useState(false)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
+  const [isDelayedDrawerOpen, setIsDelayedDrawerOpen] = useState(false)
+  const [delayedAlertSelection, setDelayedAlertSelection] = useState<AlertOptionId>('all')
+  const [delayedSelectedCount, setDelayedSelectedCount] = useState<number | null>(null)
 
   const [globalFilters, setGlobalFilters] = useState<GlobalFilters>({
     locationId: undefined,
@@ -69,6 +74,8 @@ export default function SummaryDashboardPage() {
     error,
     refetch
   } = useMetricsData(activeTab, globalFilters)
+
+  const { analytics: delayedAnalytics } = useDelayedJourneysAnalytics(globalFilters)
 
   const displayTabData = tabData ?? countsData
   const displayLoading = !displayTabData && (isLoading || countsLoading)
@@ -115,6 +122,12 @@ export default function SummaryDashboardPage() {
     if (mode === 'table') {
       console.log('Table view selected - implementation pending design')
     }
+  }, [])
+
+  const handleOpenDelayedDrawer = useCallback((alert: AlertOptionId, count: number) => {
+    setDelayedAlertSelection(alert)
+    setDelayedSelectedCount(count)
+    setIsDelayedDrawerOpen(true)
   }, [])
 
   const handleJourneysViewModeChange = useCallback((mode: JourneysViewMode) => {
@@ -218,6 +231,10 @@ export default function SummaryDashboardPage() {
     setSelectedOrderId(null)
   }, [])
 
+  const handleCloseDelayedDrawer = useCallback(() => {
+    setIsDelayedDrawerOpen(false)
+  }, [])
+
   if (!hasInitialLoadCompleted && isLoading) {
     return null
   }
@@ -267,6 +284,23 @@ export default function SummaryDashboardPage() {
         open={isDrawerOpen}
         orderId={selectedOrderId}
         onClose={handleCloseDrawer}
+      />
+
+      <DelayedInsightsDrawer
+        open={isDelayedDrawerOpen}
+        onClose={handleCloseDelayedDrawer}
+        selectedAlert={delayedAlertSelection}
+        onAlertChange={(alert) => {
+          if (alert === delayedAlertSelection) return
+          setDelayedAlertSelection(alert)
+          setDelayedSelectedCount(null)
+        }}
+        transporters={delayedAnalytics.transporters}
+        criticalJourneys={delayedAnalytics.criticalJourneys}
+        availableAlerts={delayedAnalytics.availableAlerts}
+        delayedCount={delayedAnalytics.delayedCount}
+        activeCount={delayedAnalytics.activeCount}
+        selectedCount={delayedSelectedCount}
       />
 
       <div style={{ padding: 'var(--spacing-x6) var(--spacing-x5)', display: 'flex', flexDirection: 'column' }}>
@@ -339,14 +373,17 @@ export default function SummaryDashboardPage() {
                 onOpenDetails={handleOpenOrderDetails}
               />
             ) : (
-              <NewLifecycleBoard
-                tabData={displayTabData}
-                globalFilters={globalFilters}
-                isLoading={displayLoading}
-                error={activeTab === 'journeys' ? null : error}
-                onRetry={handleRefresh}
-                journeysViewMode={journeysViewMode}
-              />
+              <>
+                <NewLifecycleBoard
+                  tabData={displayTabData}
+                  globalFilters={globalFilters}
+                  isLoading={displayLoading}
+                  error={activeTab === 'journeys' ? null : error}
+                  onRetry={handleRefresh}
+                  journeysViewMode={journeysViewMode}
+                  onOpenDelayedDrawer={activeTab === 'journeys' ? handleOpenDelayedDrawer : undefined}
+                />
+              </>
             )}
           </Col>
         </Row>

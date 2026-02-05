@@ -2,17 +2,25 @@ import { useNavigate } from 'react-router-dom'
 import { Typography } from 'ft-design-system'
 import type { MetricData, GlobalFilters } from '../types/metrics'
 import { buildTargetUrl } from '../data/filterMapper'
+import type { AlertOptionId } from '../data/useDelayedJourneysAnalytics'
+import { getDelayedDrawerSelection } from '../utils/delayedDrawer'
 
 interface ExceptionItemProps {
   metric: MetricData
   globalFilters: GlobalFilters
+  onOpenDelayedDrawer?: (alert: AlertOptionId, count: number) => void
 }
 
-export default function ExceptionItem({ metric, globalFilters }: ExceptionItemProps) {
+export default function ExceptionItem({ metric, globalFilters, onOpenDelayedDrawer }: ExceptionItemProps) {
   const navigate = useNavigate()
   const displayCount = metric.isMissing ? '-' : metric.count.toLocaleString()
 
   const handleClick = () => {
+    const delayedSelection = getDelayedDrawerSelection(metric)
+    if (delayedSelection && onOpenDelayedDrawer) {
+      onOpenDelayedDrawer(delayedSelection, metric.count)
+      return
+    }
     const url = buildTargetUrl(metric.target, globalFilters)
     navigate(url)
   }

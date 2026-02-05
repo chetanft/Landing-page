@@ -3,6 +3,18 @@ import { TokenManager, UserContext } from './tokenManager'
 import { AuthApiService, authUtils } from './authApiService'
 import { realApiService } from '../data/realApiService'
 import { clearCompanyCache } from '../data/companyApiService'
+import {
+  type AuthPhase,
+  setAuthPhase,
+  getAuthPhase,
+  isAuthReady,
+  resetAuthState,
+  waitForAuthReady,
+  ensureAuthReady
+} from './authGate'
+
+// Re-export auth gate utilities for external use
+export { type AuthPhase, logAuthState } from './authGate'
 
 export interface LoginCredentials {
   username: string
@@ -15,10 +27,14 @@ export interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
   error: string | null
+  authPhase: AuthPhase
+  authReady: boolean
   login: (credentials: LoginCredentials) => Promise<void>
   logout: () => void
   refreshToken: () => Promise<void>
   clearError: () => void
+  waitForAuthReady: (timeoutMs?: number) => Promise<boolean>
+  ensureAuthReady: (requireDesk?: boolean, timeoutMs?: number) => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -32,6 +48,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [authPhase, setAuthPhaseState] = useState<AuthPhase>(() => getAuthPhase())
+
+  // Helper to update both local state and global auth gate
+  const updateAuthPhase = useCallback((phase: AuthPhase) => {
+    setAuthPhase(phase)
+    setAuthPhaseState(phase)
+  }, [])
 
   /**
    * Initialize auth state from stored tokens
@@ -60,6 +83,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (storedToken && storedUser && !TokenManager.isTokenExpired() && isValidJWTFormat) {
           setToken(storedToken)
           setUser(storedUser)
+          // Check if we also have a desk token for full auth readiness
+          const storedDeskToken = TokenManager.getDeskToken()
+          if (storedDeskToken && storedDeskToken !== 'undefined' && storedDeskToken !== 'null') {
+            setAuthPhase('ready')
+            setAuthPhaseState('ready')
+          } else {
+            setAuthPhase('tokens_ready')
+            setAuthPhaseState('tokens_ready')
+          }
         } else if (storedToken && !TokenManager.isTokenExpired() && isValidJWTFormat) {
           // If we have a token but no user context, decode token to get user context
           const decodeJwt = (tokenValue: string) => {
@@ -101,6 +133,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             TokenManager.setUserContext(realUser)
             setToken(storedToken)
             setUser(realUser)
+            // Check if we also have a desk token for full auth readiness
+            const storedDeskToken = TokenManager.getDeskToken()
+            if (storedDeskToken && storedDeskToken !== 'undefined' && storedDeskToken !== 'null') {
+              setAuthPhase('ready')
+              setAuthPhaseState('ready')
+            } else {
+              setAuthPhase('tokens_ready')
+              setAuthPhaseState('tokens_ready')
+            }
           } else {
             // Invalid token - clear it
             TokenManager.clearAuth()
@@ -155,6 +196,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = useCallback(async (credentials: LoginCredentials): Promise<void> => {
     setIsLoading(true)
     setError(null)
+    updateAuthPhase('logging_in')
 
     try {
       // Clear any stale tokens before starting a fresh login
@@ -177,6 +219,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Update state
       setToken(tokens.accessToken)
       setUser(userContext)
+
+      // Mark tokens as ready (login token stored)
+      updateAuthPhase('tokens_ready')
 
       // FT app flow: fetch desks and get desk token (used for indent API)
       try {
@@ -227,11 +272,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               expiresAt: Date.now() + (60 * 60 * 1000),
               tokenType: 'Bearer'
             })
+            // Mark desk token as ready
+            updateAuthPhase('desk_ready')
             if (import.meta.env.DEV) {
               console.log('[AuthContext] Stored desk token length:', deskTokenResponse.auth_token.length)
             }
-          } else if (import.meta.env.DEV) {
-            console.warn('[AuthContext] Desk token missing in response')
+          } else {
+            if (import.meta.env.DEV) {
+              console.warn('[AuthContext] Desk token missing in response')
+            }
+            // Desk token failed but login succeeded - still mark as ready for non-desk APIs
+            updateAuthPhase('ready')
           }
 
           // Fetch role permissions (access-control uses desk token)
@@ -252,8 +303,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               console.warn('[AuthContext] Failed to fetch role permissions:', permissionError)
             }
           }
-        } else if (import.meta.env.DEV) {
-          console.warn('[AuthContext] No desks found for user')
+
+          // Mark auth as fully ready after all tokens and permissions are set
+          updateAuthPhase('ready')
+        } else {
+          if (import.meta.env.DEV) {
+            console.warn('[AuthContext] No desks found for user')
+          }
+          // No desks available - still mark as ready for non-desk APIs
+          updateAuthPhase('ready')
         }
       } catch (deskError) {
         if (import.meta.env.DEV) {
@@ -265,16 +323,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           })
         }
         console.warn('Failed to fetch desk token:', deskError)
+        // Desk token failed but login succeeded - still allow non-desk APIs
+        updateAuthPhase('ready')
       }
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Login failed'
       setError(errorMessage)
+      updateAuthPhase('failed')
       throw err
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [updateAuthPhase])
 
   /**
    * Refresh token function
@@ -285,6 +346,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!currentRefreshToken) {
       throw new Error('No refresh token available')
     }
+
+    // Pause gated API calls during refresh
+    updateAuthPhase('refreshing')
 
     try {
       const response = await AuthApiService.refreshToken(currentRefreshToken)
@@ -302,13 +366,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(userContext)
       }
 
+      // Restore to ready state after successful refresh
+      updateAuthPhase('ready')
+
     } catch (err) {
       TokenManager.clearAuth()
       setToken(null)
       setUser(null)
+      updateAuthPhase('failed')
       throw err
     }
-  }, [])
+  }, [updateAuthPhase])
 
   /**
    * Logout function
@@ -326,9 +394,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Clear local storage and state
     TokenManager.clearAuth()
     clearCompanyCache()
+    resetAuthState()
     setToken(null)
     setUser(null)
     setError(null)
+    setAuthPhaseState('idle')
   }, [])
 
   /**
@@ -344,10 +414,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated: !!(token && user && !TokenManager.isTokenExpired()),
     isLoading,
     error,
+    authPhase,
+    authReady: isAuthReady(),
     login,
     logout,
     refreshToken,
-    clearError
+    clearError,
+    waitForAuthReady,
+    ensureAuthReady
   }
 
   return (
