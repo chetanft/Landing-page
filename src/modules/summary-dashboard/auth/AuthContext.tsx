@@ -167,6 +167,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     initializeAuth()
+    // Intentionally run once on mount - refreshToken is used inside but not as a reactive dependency
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   /**
@@ -190,6 +192,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       return () => clearTimeout(timeoutId)
     }
+    // logout/refreshToken are stable callbacks defined later - used inside setTimeout, not synchronously
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, user])
 
   /**

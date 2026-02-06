@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { TabId, TabData, GlobalFilters } from '../types/metrics'
-import { fetchTabCounts, fetchTabMetrics } from './metricsService'
+import { fetchTabCounts, fetchTabMetrics } from '../data/metricsService'
 import { isAuthError } from '../utils/apiUtils'
 import { useAuth } from '../auth/AuthContext'
 
@@ -114,30 +114,3 @@ export const useMetricsData = (
   }
 }
 
-/**
- * Hook for pre-fetching adjacent tabs
- */
-export const usePrefetchTabs = (
-  currentTab: TabId,
-  globalFilters: GlobalFilters
-) => {
-  const tabs: TabId[] = ['orders', 'journeys', 'shipments', 'invoices']
-  const adjacentTabs = tabs.filter((t) => t !== currentTab)
-
-  // Pre-fetch adjacent tabs with lower priority
-  adjacentTabs.forEach((tab) => {
-    useQuery({
-      queryKey: [
-        'metrics',
-        tab,
-        globalFilters.locationId,
-        globalFilters.priority?.slice().sort().join(',') ?? '',
-        globalFilters.dateRange.start.toISOString(),
-        globalFilters.dateRange.end.toISOString()
-      ],
-      queryFn: () => fetchTabMetrics(tab, globalFilters),
-      staleTime: STALE_TIME * 2, // Longer stale time for prefetched data
-      enabled: false, // Don't auto-fetch, just prepare the query
-    })
-  })
-}

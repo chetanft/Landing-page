@@ -6,7 +6,7 @@ import {
   getAllJourneySearchItems,
   subscribeToJourneySearchUpdates,
   getJourneyAlertsForJourney
-} from './journeyApiService'
+} from '../data/journeyApiService'
 
 export type AlertOptionId = 'all' | 'long_stoppage' | 'stop_breach' | 'route_deviation' | 'eway_bill' | 'diversion'
 
@@ -240,6 +240,9 @@ export const useDelayedJourneysAnalytics = (globalFilters: GlobalFilters) => {
       criticalJourneys: sortedCritical,
       availableAlerts: ['all', ...KNOWN_ALERTS]
     }
+  // cacheTick triggers re-computation when journey cache updates
+  // globalFilters included to refresh when filters change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [globalFilters, cacheTick, isAuthenticated])
 
   return { analytics, loading, error }

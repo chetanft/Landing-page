@@ -22,6 +22,11 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run lint && npm run build",
+    "ci": "npm run typecheck && npm run lint",
     "copy:ft-assets": "node scripts/copy-ft-design-assets.mjs",
     "fetch:journey-snapshots": "node scripts/fetch-journey-snapshots.mjs"
   },
@@ -41,10 +46,16 @@
     "react-router-dom": "^7.12.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@types/crypto-js": "^4.2.2",
     "@types/react": "^19.2.8",
     "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
     "@vitejs/plugin-react": "^5.1.2",
+    "eslint": "^9.39.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.1"
   },

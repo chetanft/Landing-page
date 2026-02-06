@@ -30,11 +30,7 @@ export default function TabControls({
   onFilterClick,
 }: TabControlsProps) {
   const handleFilterClick = () => {
-    if (onFilterClick) {
-      onFilterClick()
-    } else {
-      console.log('Filter button clicked')
-    }
+    onFilterClick?.()
   }
 
   const handleViewModeChange = (value: string) => {

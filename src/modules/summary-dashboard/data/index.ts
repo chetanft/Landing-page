@@ -1,5 +1,4 @@
 export * from './metricsRegistry'
 export * from './metricsService'
 export * from './filterMapper'
-export * from './useMetricsData'
 export * from './webhookHandlers'

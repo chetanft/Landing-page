@@ -1,6 +1,6 @@
 import { Card, Icon, Typography, Divider } from 'ft-design-system'
 import type { LifecycleStage, GlobalFilters } from '../types/metrics'
-import type { AlertOptionId } from '../data/useDelayedJourneysAnalytics'
+import type { AlertOptionId } from '../hooks/useDelayedJourneysAnalytics'
 import ProgressItem from './ProgressItem'
 import ExceptionItem from './ExceptionItem'
 import StatusItem from './StatusItem'

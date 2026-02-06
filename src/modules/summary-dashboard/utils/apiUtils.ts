@@ -83,7 +83,7 @@ const handleTokenRefresh = async (): Promise<void> => {
       }
       TokenManager.setUserContext(userContext)
     }
-  } catch (error) {
+  } catch {
     TokenManager.clearAuth()
     throw new AuthenticationError('Token refresh failed')
   }

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import DeckGL from '@deck.gl/react'
-import type { Color } from '@deck.gl/core'
 import { Map as MapGL } from 'react-map-gl/maplibre'
 import maplibregl from 'maplibre-gl'
 import { ScatterplotLayer, TextLayer } from '@deck.gl/layers'
@@ -8,6 +7,13 @@ import { HeatmapLayer } from '@deck.gl/aggregation-layers'
 import { Typography } from 'ft-design-system'
 import type { TabData, GlobalFilters } from '../types/metrics'
 import { getJourneyMapPoints, subscribeToJourneySearchUpdates, type JourneyMapPoint } from '../data/journeyApiService'
+import {
+  FALLBACK_ON_TIME_COLOR,
+  FALLBACK_DELAYED_COLOR,
+  resolveCssVarColor,
+  buildGridCounts,
+  type GridCount
+} from '../utils/mapUtils'
 
 interface JourneyMapViewProps {
   tabData: TabData | null
@@ -22,94 +28,16 @@ const DEFAULT_VIEW_STATE = {
   bearing: 0
 }
 
-const FALLBACK_ON_TIME_COLOR: [number, number, number, number] = [34, 197, 94, 220]
-const FALLBACK_DELAYED_COLOR: [number, number, number, number] = [239, 68, 68, 220]
 const COUNTS_MAX_ZOOM = 8
-const parseCssColor = (value: string, fallback: [number, number, number, number]): [number, number, number, number] => {
-  const trimmed = value.trim()
-  if (!trimmed) return fallback
-  if (trimmed.startsWith('#')) {
-    const hex = trimmed.replace('#', '')
-    if (hex.length === 3) {
-      const r = parseInt(hex[0] + hex[0], 16)
-      const g = parseInt(hex[1] + hex[1], 16)
-      const b = parseInt(hex[2] + hex[2], 16)
-      return [r, g, b, fallback[3]]
-    }
-    if (hex.length === 6) {
-      const r = parseInt(hex.slice(0, 2), 16)
-      const g = parseInt(hex.slice(2, 4), 16)
-      const b = parseInt(hex.slice(4, 6), 16)
-      return [r, g, b, fallback[3]]
-    }
-  }
-  const rgbMatch = trimmed.match(/rgba?\(([^)]+)\)/i)
-  if (rgbMatch) {
-    const parts = rgbMatch[1].split(',').map(part => part.trim())
-    const r = Number(parts[0])
-    const g = Number(parts[1])
-    const b = Number(parts[2])
-    const a = parts[3] !== undefined ? Math.round(Number(parts[3]) * 255) : fallback[3]
-    if (![r, g, b].some(Number.isNaN)) {
-      return [r, g, b, Number.isNaN(a) ? fallback[3] : a]
-    }
-  }
-  return fallback
-}
-
-const toColor = (value: [number, number, number, number]): Color => {
-  return new Uint8ClampedArray(value)
-}
-
-const resolveCssVarColor = (cssVar: string, fallback: [number, number, number, number]): Color => {
-  if (typeof window === 'undefined') return toColor(fallback)
-  const value = getComputedStyle(document.documentElement).getPropertyValue(cssVar)
-  return toColor(parseCssColor(value, fallback))
-}
-
-const getGridStep = (zoom: number): number => {
-  if (zoom < 5) return 2
-  if (zoom < 7) return 1
-  return 0.5
-}
-
-const buildGridCounts = (points: JourneyMapPoint[], zoom: number) => {
-  const step = getGridStep(zoom)
-  const buckets: Map<string, { lng: number; lat: number; count: number; sumLng: number; sumLat: number }> = new Map()
-
-  points.forEach(point => {
-    const bucketLng = Math.floor(point.lng / step) * step
-    const bucketLat = Math.floor(point.lat / step) * step
-    const key = `${bucketLng}:${bucketLat}`
-    const existing = buckets.get(key)
-    if (existing) {
-      existing.count += 1
-      existing.sumLng += point.lng
-      existing.sumLat += point.lat
-    } else {
-      buckets.set(key, {
-        lng: bucketLng + step / 2,
-        lat: bucketLat + step / 2,
-        count: 1,
-        sumLng: point.lng,
-        sumLat: point.lat
-      })
-    }
-  })
-
-  return Array.from(buckets.values()).map(bucket => ({
-    lng: bucket.sumLng / bucket.count,
-    lat: bucket.sumLat / bucket.count,
-    count: bucket.count
-  }))
-}
 
 export default function JourneyMapView({ tabData, globalFilters }: JourneyMapViewProps) {
   const [viewState, setViewState] = useState(DEFAULT_VIEW_STATE)
   const [cacheTick, setCacheTick] = useState(0)
   
+  // tabData and cacheTick trigger recalculation when journey cache updates
   const mapPoints = useMemo<JourneyMapPoint[]>(
     () => getJourneyMapPoints(globalFilters),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [globalFilters, tabData, cacheTick]
   )
   const visiblePoints = useMemo(
@@ -182,7 +110,7 @@ export default function JourneyMapView({ tabData, globalFilters }: JourneyMapVie
     }
 
     const gridCounts = buildGridCounts(delayedPoints, viewState.zoom)
-    const countBadge = new ScatterplotLayer<{ lng: number; lat: number; count: number }>({
+    const countBadge = new ScatterplotLayer<GridCount>({
       id: 'journey-delayed-count-badge',
       data: gridCounts,
       getPosition: d => [d.lng, d.lat],
@@ -196,7 +124,7 @@ export default function JourneyMapView({ tabData, globalFilters }: JourneyMapVie
       pickable: false
     })
 
-    const countLabels = new TextLayer<{ lng: number; lat: number; count: number }>({
+    const countLabels = new TextLayer<GridCount>({
       id: 'journey-delayed-count-labels',
       data: gridCounts,
       getPosition: d => [d.lng, d.lat],

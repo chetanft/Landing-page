@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Card, Typography, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from 'ft-design-system'
 import type { GlobalFilters } from '../types/metrics'
-import { useDelayedJourneysAnalytics, type AlertOptionId, type TransporterAlertBreakdown, getAlertLabel } from '../data/useDelayedJourneysAnalytics'
+import { useDelayedJourneysAnalytics, type AlertOptionId, type TransporterAlertBreakdown, getAlertLabel } from '../hooks/useDelayedJourneysAnalytics'
 
 interface DelayedInsightsPanelProps {
   globalFilters: GlobalFilters

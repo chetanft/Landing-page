@@ -127,6 +127,8 @@ export function useOrdersTableData({
 
   useEffect(() => {
     loadData()
+  // filterKey captures all relevant dependencies - loadData would cause infinite loop
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterKey])
 
   useEffect(() => {

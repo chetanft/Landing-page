@@ -7,6 +7,9 @@ import TestComponent from './TestComponent'
 import { useAuth } from './modules/summary-dashboard/auth/AuthContext'
 import { AppLoaderProvider, useAppLoader } from './AppLoaderContext'
 
+// FREEZE MODE: Set to true to keep loader visible for editing (dev toggle)
+const FREEZE_LOADER = false
+
 // Protected route wrapper component
 function ProtectedRoute({ children }: { children: React.ReactElement }) {
   const { isAuthenticated, isLoading } = useAuth()
@@ -15,9 +18,6 @@ function ProtectedRoute({ children }: { children: React.ReactElement }) {
   const [loaderStartTime, setLoaderStartTime] = useState<number | null>(isLoading ? Date.now() : null)
   const loaderKey = loaderStartTime ?? 'idle'
   const { isAppLoading } = useAppLoader()
-
-  // FREEZE MODE: Set to true to keep loader visible for editing
-  const FREEZE_LOADER = false
 
   useEffect(() => {
     if (FREEZE_LOADER) {

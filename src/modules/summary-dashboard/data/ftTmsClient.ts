@@ -179,7 +179,7 @@ export const ftTmsFetch = async (pathOrUrl: string, options: RequestInit = {}): 
         }
         token = tokens.accessToken
       }
-    } catch (error) {
+    } catch {
       if (import.meta.env.DEV) {
         console.warn('[ftTmsFetch] Token refresh failed; continuing with existing token')
       }
@@ -210,7 +210,7 @@ export const ftTmsFetch = async (pathOrUrl: string, options: RequestInit = {}): 
           ...( { __retried: true } as unknown as RequestInit )
         })
       }
-    } catch (error) {
+    } catch {
       if (import.meta.env.DEV) {
         console.warn('[ftTmsFetch] Desk token refresh after 401 failed')
       }
@@ -234,7 +234,7 @@ export const ftTmsFetch = async (pathOrUrl: string, options: RequestInit = {}): 
           ...( { __retried: true } as unknown as RequestInit )
         })
       }
-    } catch (error) {
+    } catch {
       if (import.meta.env.DEV) {
         console.warn('[ftTmsFetch] Token refresh after 401 failed')
       }

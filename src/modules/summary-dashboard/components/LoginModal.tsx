@@ -213,7 +213,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               disabled={isLoading}
               onClick={() => {
                 // TODO: Implement forgot password functionality
-                console.log('Forgot password clicked')
               }}
             >
               <Typography variant="body-secondary-regular" style={{ color: 'var(--primary)' }}>

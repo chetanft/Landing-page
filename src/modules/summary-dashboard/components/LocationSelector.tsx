@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { Button } from 'ft-design-system'
 import { useCompanyHierarchy, useUserSettings } from '../hooks/useRealApiData'
 
@@ -26,32 +26,34 @@ export default function LocationSelector({
   const { data: hierarchyData, isLoading: hierarchyLoading } = useCompanyHierarchy()
   const { data: userSettings, isLoading: settingsLoading } = useUserSettings()
 
-  // Build locations list from API data
-  const locations: BranchOption[] = [
-    { id: undefined, name: 'All Locations' }
-  ]
+  // Build locations list from API data (memoized to prevent unnecessary re-renders)
+  const locations = useMemo<BranchOption[]>(() => {
+    const result: BranchOption[] = [{ id: undefined, name: 'All Locations' }]
 
-  if (hierarchyData?.data?.total_branches) {
-    // Add company first
-    const company = hierarchyData.data.total_branches.find(branch => !branch.short_code)
-    if (company) {
-      locations.push({
-        id: company.fteid,
-        name: company.name,
-        isCompany: true
+    if (hierarchyData?.data?.total_branches) {
+      // Add company first
+      const company = hierarchyData.data.total_branches.find(branch => !branch.short_code)
+      if (company) {
+        result.push({
+          id: company.fteid,
+          name: company.name,
+          isCompany: true
+        })
+      }
+
+      // Add branches
+      const branches = hierarchyData.data.total_branches.filter(branch => branch.short_code)
+      branches.forEach(branch => {
+        result.push({
+          id: branch.fteid,
+          name: branch.name,
+          shortCode: branch.short_code
+        })
       })
     }
 
-    // Add branches
-    const branches = hierarchyData.data.total_branches.filter(branch => branch.short_code)
-    branches.forEach(branch => {
-      locations.push({
-        id: branch.fteid,
-        name: branch.name,
-        shortCode: branch.short_code
-      })
-    })
-  }
+    return result
+  }, [hierarchyData?.data?.total_branches])
 
   // Auto-select default branch from user settings
   useEffect(() => {

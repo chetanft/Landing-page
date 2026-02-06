@@ -1,5 +1,5 @@
 import type { MetricData } from '../types/metrics'
-import type { AlertOptionId } from '../data/useDelayedJourneysAnalytics'
+import type { AlertOptionId } from '../hooks/useDelayedJourneysAnalytics'
 
 const normalize = (value: string) => value.toLowerCase().replace(/\s+/g, ' ').trim()
 

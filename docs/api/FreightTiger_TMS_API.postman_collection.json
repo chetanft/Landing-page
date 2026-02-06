@@ -1,0 +1,972 @@
+{
+  "info": {
+    "_postman_id": "freighttiger-tms-api-collection",
+    "name": "FreightTiger TMS API",
+    "description": "Complete API collection for FreightTiger TMS Summary Dashboard.\n\nUpdated: February 2026\n\n## Authentication Flow\n1. Login with encrypted password\n2. Get available desks\n3. Get desk token for operations\n4. Use desk token for orders/indents, login token for other operations\n\n## Password Encryption\nPassword is AES encrypted using SHA256(username + dynamicId) as the key.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Generate dynamic_id if not set",
+                  "let dynamicId = pm.environment.get('dynamic_id');",
+                  "if (!dynamicId || dynamicId === '') {",
+                  "    const timestamp = Date.now();",
+                  "    const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {",
+                  "        const r = Math.random() * 16 | 0;",
+                  "        const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+                  "        return v.toString(16);",
+                  "    });",
+                  "    dynamicId = timestamp + uuid;",
+                  "    pm.environment.set('dynamic_id', dynamicId);",
+                  "    console.log('Generated dynamic_id:', dynamicId);",
+                  "}",
+                  "",
+                  "// Try to encrypt password if plain_password is set",
+                  "const plainPassword = pm.environment.get('plain_password');",
+                  "const username = pm.environment.get('username');",
+                  "",
+                  "if (plainPassword && username && dynamicId) {",
+                  "    try {",
+                  "        const CryptoJS = require('crypto-js');",
+                  "        const key = CryptoJS.SHA256(username + dynamicId).toString(CryptoJS.enc.Hex);",
+                  "        const encryptedPassword = CryptoJS.AES.encrypt(plainPassword, key).toString();",
+                  "        pm.environment.set('password', encryptedPassword);",
+                  "        console.log('Password encrypted successfully');",
+                  "    } catch (e) {",
+                  "        console.log('CryptoJS not available - use password-encryptor.html tool');",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    const authToken = jsonData.auth_token || jsonData.data?.auth_token;",
+                  "    const accessToken = jsonData.access_token || jsonData.accessToken || authToken;",
+                  "    const refreshToken = jsonData.refresh_token || jsonData.refreshToken || jsonData.data?.refresh_token;",
+                  "    ",
+                  "    if (accessToken) {",
+                  "        pm.environment.set('access_token', accessToken);",
+                  "        console.log('Access token saved');",
+                  "        ",
+                  "        if (refreshToken) {",
+                  "            pm.environment.set('refresh_token', refreshToken);",
+                  "            console.log('Refresh token saved');",
+                  "        }",
+                  "        ",
+                  "        // Extract user context from JWT",
+                  "        try {",
+                  "            const tokenParts = accessToken.split('.');",
+                  "            if (tokenParts.length === 3) {",
+                  "                const payload = tokenParts[1].replace(/-/g, '+').replace(/_/g, '/');",
+                  "                const decoded = JSON.parse(atob(payload));",
+                  "                const ucv = decoded?.ucv || {};",
+                  "                ",
+                  "                if (ucv.id) pm.environment.set('user_fteid', String(ucv.id));",
+                  "                if (ucv.companyId) {",
+                  "                    pm.environment.set('org_id', String(ucv.companyId));",
+                  "                    pm.environment.set('company_fteid', String(ucv.companyId));",
+                  "                }",
+                  "                if (ucv.groupId) pm.environment.set('branch_fteid', String(ucv.groupId));",
+                  "                console.log('User context extracted from token');",
+                  "            }",
+                  "        } catch (e) {",
+                  "            console.log('Could not decode JWT');",
+                  "        }",
+                  "        ",
+                  "        pm.test('Login successful', function () {",
+                  "            pm.expect(accessToken).to.not.be.empty;",
+                  "        });",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-ft-unique-id", "value": "{{dynamic_id}}" },
+              { "key": "Origin", "value": "https://www.freighttiger.com" },
+              { "key": "Referer", "value": "https://www.freighttiger.com/" },
+              { "key": "Cache-Control", "value": "no-cache" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\",\n  \"grant_type\": \"password\",\n  \"app_id\": \"{{app_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/authentication/v1/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "authentication", "v1", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    const accessToken = jsonData.accessToken || jsonData.auth_token;",
+                  "    const refreshToken = jsonData.refreshToken || jsonData.refresh_token;",
+                  "    if (accessToken) pm.environment.set('access_token', accessToken);",
+                  "    if (refreshToken) pm.environment.set('refresh_token', refreshToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "token", "value": "{{access_token}}" },
+              { "key": "x-ft-userid", "value": "{{user_fteid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\",\n  \"app_id\": \"web\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/authentication/v1/auth/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["api", "authentication", "v1", "auth", "refresh"]
+            }
+          }
+        },
+        {
+          "name": "Get Desks",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    const desks = jsonData.data || [];",
+                  "    if (desks.length > 0) {",
+                  "        pm.environment.set('desk_fteid', desks[0].fteid || desks[0].id);",
+                  "        console.log('First desk FTEID saved:', desks[0].fteid);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "source", "value": "platform" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/entity-service/v1/desk",
+              "host": ["{{base_url}}"],
+              "path": ["api", "entity-service", "v1", "desk"]
+            }
+          }
+        },
+        {
+          "name": "Get Desk Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    const deskToken = jsonData.auth_token || jsonData.data?.auth_token;",
+                  "    const deskRefresh = jsonData.refresh_token || jsonData.data?.refresh_token;",
+                  "    if (deskToken) {",
+                  "        pm.environment.set('desk_token', deskToken);",
+                  "        console.log('Desk token saved');",
+                  "    }",
+                  "    if (deskRefresh) {",
+                  "        pm.environment.set('desk_refresh_token', deskRefresh);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "token", "value": "{{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/authentication/v1/auth/token/desk/{{desk_fteid}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "authentication", "v1", "auth", "token", "desk", "{{desk_fteid}}"]
+            }
+          }
+        },
+        {
+          "name": "Refresh Desk Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "token", "value": "{{desk_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{desk_refresh_token}}\",\n  \"app_id\": \"web\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/authentication/v1/auth/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["api", "authentication", "v1", "auth", "refresh"]
+            }
+          }
+        },
+        {
+          "name": "Validate Token",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/authentication/v1/auth/login/validate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "authentication", "v1", "auth", "login", "validate"]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/authentication/v1/auth/login/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "authentication", "v1", "auth", "login", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Journeys",
+      "item": [
+        {
+          "name": "Get Journey Counts",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-Org-Id", "value": "{{org_id}}" },
+              { "key": "X-Branch-Id", "value": "{{branch_fteid}}", "disabled": true }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/journey-snapshot/v1/journeys/count?page=1&size=20&entity_type=CNR&journey_status=IN_TRANSIT&start_time_utc={{start_date}}&end_time_utc={{end_date}}&journey_direction=outbound&journey_stop_type=source&sort[sort_by]=created_at&sort[sort_by_order]=DESC",
+              "host": ["{{base_url}}"],
+              "path": ["api", "journey-snapshot", "v1", "journeys", "count"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "20" },
+                { "key": "entity_type", "value": "CNR" },
+                { "key": "journey_status", "value": "IN_TRANSIT" },
+                { "key": "start_time_utc", "value": "{{start_date}}", "description": "Format: YYYY-MM-DD+HH:MM:SS" },
+                { "key": "end_time_utc", "value": "{{end_date}}" },
+                { "key": "journey_direction", "value": "outbound" },
+                { "key": "journey_stop_type", "value": "source" },
+                { "key": "sort[sort_by]", "value": "created_at" },
+                { "key": "sort[sort_by_order]", "value": "DESC" },
+                { "key": "milestones[]", "value": "PLANNED", "disabled": true },
+                { "key": "milestones[]", "value": "IN_TRANSIT", "disabled": true },
+                { "key": "active_alerts[]", "value": "long_stoppage", "disabled": true },
+                { "key": "active_alerts[]", "value": "route_deviation", "disabled": true },
+                { "key": "consignor_fteid", "value": "{{consignor_fteid}}", "disabled": true },
+                { "key": "transporter_fteid", "value": "{{transporter_fteid}}", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Journeys",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-Org-Id", "value": "{{org_id}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/journey-snapshot/v1/journeys/search?page=1&size=20&entity_type=CNR&journey_status=IN_TRANSIT&start_time_utc={{start_date}}&end_time_utc={{end_date}}&journey_direction=outbound&journey_stop_type=source&sort[sort_by]=created_at&sort[sort_by_order]=DESC",
+              "host": ["{{base_url}}"],
+              "path": ["api", "journey-snapshot", "v1", "journeys", "search"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "20" },
+                { "key": "entity_type", "value": "CNR" },
+                { "key": "journey_status", "value": "IN_TRANSIT" },
+                { "key": "start_time_utc", "value": "{{start_date}}" },
+                { "key": "end_time_utc", "value": "{{end_date}}" },
+                { "key": "journey_direction", "value": "outbound" },
+                { "key": "journey_stop_type", "value": "source" },
+                { "key": "sort[sort_by]", "value": "created_at" },
+                { "key": "sort[sort_by_order]", "value": "DESC" },
+                { "key": "milestones[]", "value": "IN_TRANSIT", "disabled": true },
+                { "key": "active_alerts[]", "value": "long_stoppage", "disabled": true },
+                { "key": "active_analytics[]", "value": "delay_in_minutes", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Journey Tracking Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-Org-Id", "value": "{{org_id}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/journey-snapshot/v1/journeys/{{journey_fteid}}/details/tracking?entity_type=CNR&journey_stop_type=source&journey_direction=outbound",
+              "host": ["{{base_url}}"],
+              "path": ["api", "journey-snapshot", "v1", "journeys", "{{journey_fteid}}", "details", "tracking"],
+              "query": [
+                { "key": "entity_type", "value": "CNR" },
+                { "key": "journey_stop_type", "value": "source" },
+                { "key": "journey_direction", "value": "outbound" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Journey Alerts",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-Org-Id", "value": "{{org_id}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/journey-snapshot/v1/journeys/{{journey_fteid}}/details/alerts?entity_type=CNR&journey_stop_type=source&journey_direction=outbound",
+              "host": ["{{base_url}}"],
+              "path": ["api", "journey-snapshot", "v1", "journeys", "{{journey_fteid}}", "details", "alerts"],
+              "query": [
+                { "key": "entity_type", "value": "CNR" },
+                { "key": "journey_stop_type", "value": "source" },
+                { "key": "journey_direction", "value": "outbound" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Journey Tracking Path",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-Org-Id", "value": "{{org_id}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/journey-snapshot/v1/journeys/{{journey_fteid}}/details/tracking/path?entity_type=CNR&journey_stop_type=source&journey_direction=outbound",
+              "host": ["{{base_url}}"],
+              "path": ["api", "journey-snapshot", "v1", "journeys", "{{journey_fteid}}", "details", "tracking", "path"],
+              "query": [
+                { "key": "entity_type", "value": "CNR" },
+                { "key": "journey_stop_type", "value": "source" },
+                { "key": "journey_direction", "value": "outbound" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Journey Loads",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-Org-Id", "value": "{{org_id}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/journey-snapshot/v1/journeys/{{journey_fteid}}/details/loads?entity_type=CNR&journey_stop_type=source&journey_direction=outbound",
+              "host": ["{{base_url}}"],
+              "path": ["api", "journey-snapshot", "v1", "journeys", "{{journey_fteid}}", "details", "loads"],
+              "query": [
+                { "key": "entity_type", "value": "CNR" },
+                { "key": "journey_stop_type", "value": "source" },
+                { "key": "journey_direction", "value": "outbound" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Journey POD Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/epod-service-v2/v1/journey-fte/pod-summary/journey_fteid/{{journey_fteid}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "epod-service-v2", "v1", "journey-fte", "pod-summary", "journey_fteid", "{{journey_fteid}}"]
+            }
+          }
+        },
+        {
+          "name": "Get ePOD List - AWAITING_APPROVAL",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/trip-snapshot/api/v1/epods?page=1&size=1&epod_status=AWAITING_APPROVAL",
+              "host": ["{{base_url}}"],
+              "path": ["api", "trip-snapshot", "api", "v1", "epods"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "1" },
+                { "key": "epod_status", "value": "AWAITING_APPROVAL" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get ePOD List - PENDING_SUBMISSION",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/trip-snapshot/api/v1/epods?page=1&size=1&epod_status=PENDING_SUBMISSION",
+              "host": ["{{base_url}}"],
+              "path": ["api", "trip-snapshot", "api", "v1", "epods"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "1" },
+                { "key": "epod_status", "value": "PENDING_SUBMISSION" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Orders (PTL Booking)",
+      "item": [
+        {
+          "name": "Get Orders Bucket Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/ptl-booking/api/v1/order/myOrdersBucketSummary?from_booking_date={{from_timestamp}}&to_booking_date={{to_timestamp}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ptl-booking", "api", "v1", "order", "myOrdersBucketSummary"],
+              "query": [
+                { "key": "from_booking_date", "value": "{{from_timestamp}}", "description": "Timestamp in milliseconds" },
+                { "key": "to_booking_date", "value": "{{to_timestamp}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Order Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/ptl-booking/api/v1/order/{{order_id}}/details",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ptl-booking", "api", "v1", "order", "{{order_id}}", "details"]
+            }
+          }
+        },
+        {
+          "name": "Get Order Comments",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/ptl-booking/api/v1/order/{{order_id}}/comments",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ptl-booking", "api", "v1", "order", "{{order_id}}", "comments"]
+            }
+          }
+        },
+        {
+          "name": "Add Order Comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"comment\": \"Your comment text\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ptl-booking/api/v1/order/{{order_id}}/comments",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ptl-booking", "api", "v1", "order", "{{order_id}}", "comments"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Indents (Cyclops)",
+      "description": "Indent APIs use 'token' header instead of 'Authorization: Bearer'. Do NOT include X-Org-Id or X-Branch-Id headers.",
+      "item": [
+        {
+          "name": "Get Indent Counts",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "token", "value": "{{desk_token}}", "description": "Uses desk token or access token (NOT Authorization Bearer)" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/cyclops/indent/consignor/list/count",
+              "host": ["{{base_url}}"],
+              "path": ["api", "cyclops", "indent", "consignor", "list", "count"],
+              "query": [
+                { "key": "consignor_fteid", "value": "{{consignor_fteid}}", "disabled": true },
+                { "key": "transporter_fteid", "value": "{{transporter_fteid}}", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Indent Consignees",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "token", "value": "{{desk_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/cyclops/indent/dashboard/consignee",
+              "host": ["{{base_url}}"],
+              "path": ["api", "cyclops", "indent", "dashboard", "consignee"]
+            }
+          }
+        },
+        {
+          "name": "Get Indent Transporters",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "token", "value": "{{desk_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/cyclops/indent/dashboard/transporters",
+              "host": ["{{base_url}}"],
+              "path": ["api", "cyclops", "indent", "dashboard", "transporters"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Shipments (PTL v2)",
+      "item": [
+        {
+          "name": "Get Shipment Bucket Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/ptl-v2/api/v1/shipment/myShipmentBucketSummary?from_booking_date={{from_timestamp}}&to_booking_date={{to_timestamp}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ptl-v2", "api", "v1", "shipment", "myShipmentBucketSummary"],
+              "query": [
+                { "key": "from_booking_date", "value": "{{from_timestamp}}" },
+                { "key": "to_booking_date", "value": "{{to_timestamp}}" },
+                { "key": "consignor_fteid", "value": "{{consignor_fteid}}", "disabled": true },
+                { "key": "transporter_fteid", "value": "{{transporter_fteid}}", "disabled": true },
+                { "key": "consignee_fteid", "value": "{{consignee_fteid}}", "disabled": true },
+                { "key": "priority[]", "value": "high", "disabled": true },
+                { "key": "priority[]", "value": "standard", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Shipment Specific Bucket Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/ptl-v2/api/v1/shipment/myShipmentSpecificBucketSummary?bucket_name=ACTIVE&from_booking_date={{from_timestamp}}&to_booking_date={{to_timestamp}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ptl-v2", "api", "v1", "shipment", "myShipmentSpecificBucketSummary"],
+              "query": [
+                { "key": "bucket_name", "value": "ACTIVE", "description": "ACTIVE or DELIVERED" },
+                { "key": "from_booking_date", "value": "{{from_timestamp}}" },
+                { "key": "to_booking_date", "value": "{{to_timestamp}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Shipments List",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/ptl-v2/api/v1/shipment/myShipments?page=1&size=20&from_booking_date={{from_timestamp}}&to_booking_date={{to_timestamp}}&sort_by=created_at&sort_by_order=DESC",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ptl-v2", "api", "v1", "shipment", "myShipments"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "20" },
+                { "key": "from_booking_date", "value": "{{from_timestamp}}" },
+                { "key": "to_booking_date", "value": "{{to_timestamp}}" },
+                { "key": "sort_by", "value": "created_at" },
+                { "key": "sort_by_order", "value": "DESC" },
+                { "key": "milestone", "value": "DELIVERED", "disabled": true },
+                { "key": "pod_status", "value": "AVAILABLE", "disabled": true, "description": "AVAILABLE or PENDING" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Planning Engine",
+      "item": [
+        {
+          "name": "Get User Settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{planning_base_url}}/configurations/user-settings",
+              "host": ["{{planning_base_url}}"],
+              "path": ["configurations", "user-settings"]
+            }
+          }
+        },
+        {
+          "name": "Get Order Status Counts",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{planning_base_url}}/orders/status-counts",
+              "host": ["{{planning_base_url}}"],
+              "path": ["orders", "status-counts"]
+            }
+          }
+        },
+        {
+          "name": "Orders Master Search",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{desk_token}}", "description": "Prefers desk token" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"page\": 1,\n  \"size\": 20,\n  \"group_fteid\": null,\n  \"branch_fteid\": \"{{branch_fteid}}\",\n  \"sort\": [\"-updatedAt\"],\n  \"filters\": [\n    {\n      \"field\": \"STATUS\",\n      \"operator\": \"in\",\n      \"value\": [\"UNPLANNED\", \"PARTIALLY_PLANNED\", \"PLANNED\", \"DISPATCHED\"]\n    },\n    {\n      \"field\": \"CREATED_AT\",\n      \"operator\": \">=\",\n      \"value\": {{from_timestamp}}\n    },\n    {\n      \"field\": \"CREATED_AT\",\n      \"operator\": \"<=\",\n      \"value\": {{to_timestamp}}\n    }\n  ],\n  \"includeDeletedOnly\": false\n}"
+            },
+            "url": {
+              "raw": "{{planning_base_url}}/orders/master-search",
+              "host": ["{{planning_base_url}}"],
+              "path": ["orders", "master-search"]
+            }
+          }
+        },
+        {
+          "name": "Get Custom Data Template",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{planning_base_url}}/custom-data-template/order",
+              "host": ["{{planning_base_url}}"],
+              "path": ["custom-data-template", "order"]
+            }
+          }
+        },
+        {
+          "name": "Get Company Hierarchy",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{desk_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{planning_base_url}}/external-services/eqs/company/child?branch_fteid={{branch_fteid}}",
+              "host": ["{{planning_base_url}}"],
+              "path": ["external-services", "eqs", "company", "child"],
+              "query": [
+                { "key": "branch_fteid", "value": "{{branch_fteid}}", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Selected Orders Views",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{planning_base_url}}/views/selected/orders",
+              "host": ["{{planning_base_url}}"],
+              "path": ["views", "selected", "orders"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Access Control",
+      "item": [
+        {
+          "name": "Get Permissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{desk_token}}", "description": "Prefers desk token if available" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/access-control/v1/accessControl/permissions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "access-control", "v1", "accessControl", "permissions"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Entity Query Service (EQS)",
+      "item": [
+        {
+          "name": "Get Consignors (Partners CNR)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/eqs/v1/company/partners?parent_fteid={{company_fteid}}&filter={\"partner_type\":\"CNR\"}&sort=-updated_at&page=1&size=100",
+              "host": ["{{base_url}}"],
+              "path": ["api", "eqs", "v1", "company", "partners"],
+              "query": [
+                { "key": "parent_fteid", "value": "{{company_fteid}}" },
+                { "key": "filter", "value": "{\"partner_type\":\"CNR\"}" },
+                { "key": "sort", "value": "-updated_at" },
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "100" },
+                { "key": "q", "value": "", "disabled": true, "description": "Search query" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Consignees (Partners CEE)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/eqs/v1/company/partners?parent_fteid={{company_fteid}}&filter={\"partner_type\":\"CEE\"}&sort=-updated_at&page=1&size=100",
+              "host": ["{{base_url}}"],
+              "path": ["api", "eqs", "v1", "company", "partners"],
+              "query": [
+                { "key": "parent_fteid", "value": "{{company_fteid}}" },
+                { "key": "filter", "value": "{\"partner_type\":\"CEE\"}" },
+                { "key": "sort", "value": "-updated_at" },
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "100" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Transporters (Partners TRN)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/eqs/v1/company/partners?parent_fteid={{company_fteid}}&filter={\"partner_type\":\"TRN\"}&sort=-updated_at&page=1&size=100",
+              "host": ["{{base_url}}"],
+              "path": ["api", "eqs", "v1", "company", "partners"],
+              "query": [
+                { "key": "parent_fteid", "value": "{{company_fteid}}" },
+                { "key": "filter", "value": "{\"partner_type\":\"TRN\"}" },
+                { "key": "sort", "value": "-updated_at" },
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "100" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Transporters (PTL Tagged)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/eqs/v1/company/partners?parent_fteid={{company_fteid}}&filter={\"partner_type\":\"TRN\",\"tags\":\"PTL\"}&sort=-updated_at&page=1&size=100",
+              "host": ["{{base_url}}"],
+              "path": ["api", "eqs", "v1", "company", "partners"],
+              "query": [
+                { "key": "parent_fteid", "value": "{{company_fteid}}" },
+                { "key": "filter", "value": "{\"partner_type\":\"TRN\",\"tags\":\"PTL\"}" },
+                { "key": "sort", "value": "-updated_at" },
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "100" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Branches",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/eqs/v1/branch?company_fteid={{company_fteid}}&sort=-updated_at",
+              "host": ["{{base_url}}"],
+              "path": ["api", "eqs", "v1", "branch"],
+              "query": [
+                { "key": "company_fteid", "value": "{{company_fteid}}" },
+                { "key": "sort", "value": "-updated_at" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Child Branches",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/eqs/v1/company/get_child?page=1&size=100",
+              "host": ["{{base_url}}"],
+              "path": ["api", "eqs", "v1", "company", "get_child"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "100" },
+                { "key": "q", "value": "", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Company Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/eqs/v1/company/{{company_fteid}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "eqs", "v1", "company", "{{company_fteid}}"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

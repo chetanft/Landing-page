@@ -2,130 +2,36 @@
  * Authentication API service for FreightTiger
  */
 
-import { TokenManager, AuthTokens, UserContext } from './tokenManager'
+import { TokenManager, UserContext } from './tokenManager'
 import CryptoJS from 'crypto-js'
+import { buildAuthApiUrl, buildApiUrl, isValidFtUserId } from './authHelpers'
 
-// Helper to build API URL - avoids circular dependency with ftTmsClient
-const buildAuthApiUrl = (path: string): string => {
-  const envBaseUrl = import.meta.env.VITE_FT_TMS_API_BASE_URL
-  // If proxy is configured (starts with /__ft_tms), use it
-  if (envBaseUrl && envBaseUrl.startsWith('/__ft_tms')) {
-    const normalizedPath = path.startsWith('/') ? path : `/${path}`
-    // Path should be: /__ft_tms/api/authentication/v1/auth/login
-    return `${envBaseUrl}${normalizedPath}`
-  }
-  // Otherwise use direct URL
-  return path.startsWith('http') ? path : `https://api.freighttiger.com${path}`
-}
+// Re-export types and utilities for backward compatibility
+export type {
+  LoginRequest,
+  LoginResponse,
+  RefreshTokenRequest,
+  RefreshTokenResponse,
+  Desk,
+  DeskTokenResponse,
+  ValidateTokenResponse,
+  ForgotPasswordRequest,
+  ResetPasswordRequest
+} from './authTypes'
+export { AuthenticationError, PermissionError } from './authTypes'
+export { authUtils } from './authUtils'
 
-// Helper for non-auth API URLs (e.g., desks)
-const buildApiUrl = (path: string): string => {
-  const envBaseUrl = import.meta.env.VITE_FT_TMS_API_BASE_URL
-  if (envBaseUrl && envBaseUrl.startsWith('/__ft_tms')) {
-    const normalizedPath = path.startsWith('/') ? path : `/${path}`
-    return `${envBaseUrl}${normalizedPath}`
-  }
-  return path.startsWith('http') ? path : `https://api.freighttiger.com${path}`
-}
-
-const FT_USER_ID_PATTERN = /^[A-Z]{3}-[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$/
-
-const isValidFtUserId = (value?: string): value is string => {
-  return typeof value === 'string' && FT_USER_ID_PATTERN.test(value)
-}
-
-export interface LoginRequest {
-  username?: string
-  email?: string
-  password: string
-  uniqueId?: string
-  appId?: string
-}
-
-export interface LoginResponse {
-  accessToken: string
-  refreshToken: string
-  expiresIn: number
-  tokenType: string
-  user: {
-    id: string
-    email: string
-    name: string
-    organizationId: string
-    branchId: string
-    role: string
-    permissions: string[]
-  }
-}
-
-export interface RefreshTokenRequest {
-  refreshToken: string
-}
-
-export interface RefreshTokenResponse {
-  accessToken: string
-  refreshToken?: string
-  expiresIn: number
-  tokenType: string
-  user?: {
-    id: string
-    email: string
-    name: string
-    organizationId: string
-    branchId: string
-    role: string
-    permissions: string[]
-  }
-}
-
-export interface Desk {
-  fteid: string
-  parent_fteid?: string
-  name?: string
-  role_fteid?: string
-}
-
-export interface DeskTokenResponse {
-  auth_token?: string
-  refresh_token?: string
-}
-
-export interface ValidateTokenResponse {
-  valid: boolean
-  user?: {
-    id: string
-    email: string
-    name: string
-    organizationId: string
-    branchId: string
-    role: string
-    permissions: string[]
-  }
-}
-
-export interface ForgotPasswordRequest {
-  email: string
-}
-
-export interface ResetPasswordRequest {
-  token: string
-  newPassword: string
-  confirmPassword: string
-}
-
-export class AuthenticationError extends Error {
-  constructor(message: string, public statusCode?: number) {
-    super(message)
-    this.name = 'AuthenticationError'
-  }
-}
-
-export class PermissionError extends Error {
-  constructor(message: string, public statusCode?: number) {
-    super(message)
-    this.name = 'PermissionError'
-  }
-}
+import type {
+  LoginRequest,
+  LoginResponse,
+  RefreshTokenResponse,
+  Desk,
+  DeskTokenResponse,
+  ValidateTokenResponse,
+  ForgotPasswordRequest,
+  ResetPasswordRequest
+} from './authTypes'
+import { AuthenticationError } from './authTypes'
 
 export class AuthApiService {
   // Use proxy path if available (when FT_TMS_API_BASE_URL is set), otherwise use direct URL
@@ -626,64 +532,5 @@ export class AuthApiService {
       }
       throw new AuthenticationError('Network error during profile fetch')
     }
-  }
-}
-
-/**
- * Utility functions for auth integration
- */
-export const authUtils = {
-  /**
-   * Convert API login response to tokens and user context
-   */
-  convertLoginResponse(response: LoginResponse): { tokens: AuthTokens, userContext: UserContext } {
-    const tokens = TokenManager.createTokensFromResponse({
-      accessToken: response.accessToken,
-      refreshToken: response.refreshToken,
-      expiresIn: response.expiresIn,
-      tokenType: response.tokenType
-    })
-
-    const userContext: UserContext = {
-      userId: response.user.id,
-      userFteid: (response.user as { fteid?: string; userFteid?: string }).fteid
-        || (response.user as { fteid?: string; userFteid?: string }).userFteid,
-      email: response.user.email,
-      name: response.user.name,
-      orgId: response.user.organizationId,
-      branchId: response.user.branchId,
-      userRole: response.user.role
-    }
-
-    return { tokens, userContext }
-  },
-
-  /**
-   * Convert API refresh response to tokens and optional user context
-   */
-  convertRefreshResponse(response: RefreshTokenResponse): { tokens: AuthTokens, userContext?: UserContext } {
-    const tokens = TokenManager.createTokensFromResponse({
-      accessToken: response.accessToken,
-      refreshToken: response.refreshToken,
-      expiresIn: response.expiresIn,
-      tokenType: response.tokenType
-    })
-
-    let userContext: UserContext | undefined
-
-    if (response.user) {
-      userContext = {
-        userId: response.user.id,
-        userFteid: (response.user as { fteid?: string; userFteid?: string }).fteid
-          || (response.user as { fteid?: string; userFteid?: string }).userFteid,
-        email: response.user.email,
-        name: response.user.name,
-        orgId: response.user.organizationId,
-        branchId: response.user.branchId,
-        userRole: response.user.role
-      }
-    }
-
-    return { tokens, userContext }
   }
 }

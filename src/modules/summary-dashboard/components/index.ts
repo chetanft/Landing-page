@@ -1,6 +1,4 @@
 export { default as DashboardHeader } from './DashboardHeader'
-export { default as LifecycleBoard } from './LifecycleBoard'
-export { default as LifecycleColumn } from './LifecycleColumn'
 export { default as MetricCard } from './MetricCard'
 export { default as QuickKPIRow } from './QuickKPIRow'
 export { default as ExceptionsList } from './ExceptionsList'

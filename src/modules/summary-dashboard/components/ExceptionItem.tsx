@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { Typography } from 'ft-design-system'
 import type { MetricData, GlobalFilters } from '../types/metrics'
 import { buildTargetUrl } from '../data/filterMapper'
-import type { AlertOptionId } from '../data/useDelayedJourneysAnalytics'
+import type { AlertOptionId } from '../hooks/useDelayedJourneysAnalytics'
 import { getDelayedDrawerSelection } from '../utils/delayedDrawer'
 
 interface ExceptionItemProps {
