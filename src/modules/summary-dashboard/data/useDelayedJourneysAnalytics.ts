@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { GlobalFilters } from '../types/metrics'
+import { useAuth } from '../auth/AuthContext'
 import {
   ensureJourneySearchData,
   getAllJourneySearchItems,
@@ -116,11 +117,18 @@ const getJourneyAlerts = (journey: Record<string, unknown>): Exclude<AlertOption
 export const getAlertLabel = (alertId: AlertOptionId) => ALERT_LABEL_MAP[alertId]
 
 export const useDelayedJourneysAnalytics = (globalFilters: GlobalFilters) => {
+  const { isAuthenticated } = useAuth()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [cacheTick, setCacheTick] = useState(0)
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false)
+      setError(null)
+      return
+    }
+
     let active = true
     setLoading(true)
     setError(null)
@@ -138,7 +146,7 @@ export const useDelayedJourneysAnalytics = (globalFilters: GlobalFilters) => {
     return () => {
       active = false
     }
-  }, [globalFilters])
+  }, [globalFilters, isAuthenticated])
 
   useEffect(() => {
     const unsubscribe = subscribeToJourneySearchUpdates(() => {
@@ -148,6 +156,17 @@ export const useDelayedJourneysAnalytics = (globalFilters: GlobalFilters) => {
   }, [])
 
   const analytics = useMemo<DelayedJourneysAnalytics>(() => {
+    if (!isAuthenticated) {
+      return {
+        delayedCount: 0,
+        activeCount: 0,
+        delayedPercent: 0,
+        transporters: [],
+        criticalJourneys: [],
+        availableAlerts: ['all', ...KNOWN_ALERTS]
+      }
+    }
+
     const journeys = getAllJourneySearchItems()
     const transporterMap = new Map<string, TransporterAlertBreakdown>()
     let activeCount = 0
@@ -221,7 +240,7 @@ export const useDelayedJourneysAnalytics = (globalFilters: GlobalFilters) => {
       criticalJourneys: sortedCritical,
       availableAlerts: ['all', ...KNOWN_ALERTS]
     }
-  }, [globalFilters, cacheTick])
+  }, [globalFilters, cacheTick, isAuthenticated])
 
   return { analytics, loading, error }
 }

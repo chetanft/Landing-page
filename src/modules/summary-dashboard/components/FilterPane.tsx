@@ -138,7 +138,7 @@ export default function FilterPane({
           zIndex: 10051,
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden',
+          overflow: 'visible',
           transform: 'translateX(0)',
           transition: 'transform 0.3s ease-out',
         }}
@@ -176,6 +176,7 @@ export default function FilterPane({
           style={{
             padding: 'var(--spacing-x5)',
             overflowY: 'auto',
+            overflowX: 'visible',
             flex: 1,
             minHeight: 0,
           }}
@@ -215,6 +216,8 @@ export default function FilterPane({
                 value={localTransporterId || ''}
                 onChange={handleTransporterChange}
                 placeholder={transportersLoading ? 'Loading...' : 'Select transporter'}
+                portalStyle={{ zIndex: 10060 }}
+                menuStyle={{ zIndex: 10061 }}
                 options={[
                   { value: '', label: 'All Transporters' },
                   ...transporters.map((transporter) => ({
@@ -247,6 +250,8 @@ export default function FilterPane({
                 value={localConsigneeId || ''}
                 onChange={handleConsigneeChange}
                 placeholder={consigneesLoading ? 'Loading...' : 'Select consignee'}
+                portalStyle={{ zIndex: 10060 }}
+                menuStyle={{ zIndex: 10061 }}
                 options={[
                   { value: '', label: 'All Consignees' },
                   ...consignees.map((consignee) => ({

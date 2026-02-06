@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { TokenManager, UserContext } from './tokenManager'
 import { AuthApiService, authUtils } from './authApiService'
 import { realApiService } from '../data/realApiService'
@@ -44,6 +45,7 @@ export interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const queryClient = useQueryClient()
   const [user, setUser] = useState<UserContext | null>(null)
   const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -200,6 +202,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     try {
       // Clear any stale tokens before starting a fresh login
+      queryClient.clear()
       TokenManager.clearAuth()
       clearCompanyCache()
       // Use dedicated auth API service
@@ -335,7 +338,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(false)
     }
-  }, [updateAuthPhase])
+  }, [updateAuthPhase, queryClient])
 
   /**
    * Refresh token function
@@ -370,13 +373,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       updateAuthPhase('ready')
 
     } catch (err) {
+      queryClient.clear()
       TokenManager.clearAuth()
       setToken(null)
       setUser(null)
       updateAuthPhase('failed')
       throw err
     }
-  }, [updateAuthPhase])
+  }, [updateAuthPhase, queryClient])
 
   /**
    * Logout function
@@ -392,6 +396,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     // Clear local storage and state
+    queryClient.clear()
     TokenManager.clearAuth()
     clearCompanyCache()
     resetAuthState()
@@ -399,7 +404,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null)
     setError(null)
     setAuthPhaseState('idle')
-  }, [])
+  }, [queryClient])
 
   /**
    * Clear error function

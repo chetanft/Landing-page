@@ -17,10 +17,10 @@ import { useOrdersTableData } from '../hooks/useOrdersTableData'
 import { useAppLoader } from '../../../AppLoaderContext'
 
 const ALL_TABS: { id: TabId; label: string }[] = [
-  { id: 'orders', label: 'Orders' },
   { id: 'journeys', label: 'FTL' },
   { id: 'shipments', label: 'PTL' },
   { id: 'invoices', label: 'Invoices' },
+  { id: 'orders', label: 'Orders' }
 ]
 
 const getDefaultDateRange = () => {

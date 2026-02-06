@@ -192,8 +192,8 @@ export default function TabControls({
             display: 'flex'
           }}
         >
-          <SegmentedTabItem value="column" label="Column" style={{ width: 'fit-content', paddingLeft: '8px', paddingRight: '8px' }} />
           <SegmentedTabItem value="map" label="Map" style={{ width: 'fit-content', paddingLeft: '8px', paddingRight: '8px' }} />
+          <SegmentedTabItem value="column" label="Count" style={{ width: 'fit-content', paddingLeft: '8px', paddingRight: '8px' }} />
         </FTSegmentedTabs>
       </div>
     )

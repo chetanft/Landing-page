@@ -124,45 +124,7 @@ const buildRealOrdersLifecycleStages = async (
       isMissing: partiallyPlannedInfo.isMissing
     })
     
-    const validationInProgressInfo = getCountInfo(counts.VALIDATION_IN_PROGRESS)
-    planningMetrics.push({
-      metricId: 'orders.planning.validation_in_progress',
-      label: 'Validation In Progress',
-      count: validationInProgressInfo.count,
-      statusType: 'neutral',
-      target: { path: '/tms/orders', defaultFilters: { status: ['VALIDATION_IN_PROGRESS'] } },
-      isMissing: validationInProgressInfo.isMissing
-    })
-    
-    const validationSuccessInfo = getCountInfo(counts.VALIDATION_SUCCESS)
-    planningMetrics.push({
-      metricId: 'orders.planning.validation_success',
-      label: 'Validation Success',
-      count: validationSuccessInfo.count,
-      statusType: 'positive',
-      target: { path: '/tms/orders', defaultFilters: { status: ['VALIDATION_SUCCESS'] } },
-      isMissing: validationSuccessInfo.isMissing
-    })
-    
-    const validationFailureInfo = getCountInfo(counts.VALIDATION_FAILURE)
-    planningMetrics.push({
-      metricId: 'orders.planning.validation_failure',
-      label: 'Validation Failure',
-      count: validationFailureInfo.count,
-      statusType: 'warning',
-      target: { path: '/tms/orders', defaultFilters: { status: ['VALIDATION_FAILURE'] } },
-      isMissing: validationFailureInfo.isMissing
-    })
-    
-    const planningCoreFailedInfo = getCountInfo(counts.PLANNING_CORE_FAILED)
-    planningMetrics.push({
-      metricId: 'orders.planning.core_failed',
-      label: 'Planning Core Failed',
-      count: planningCoreFailedInfo.count,
-      statusType: 'critical',
-      target: { path: '/tms/orders', defaultFilters: { status: ['PLANNING_CORE_FAILED'] } },
-      isMissing: planningCoreFailedInfo.isMissing
-    })
+    // Validation and core failure states removed per requirement
 
     // Build in-execution metrics with bucket data
     const inExecutionMetrics: MetricData[] = []

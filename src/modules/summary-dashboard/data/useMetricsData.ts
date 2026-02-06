@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { TabId, TabData, GlobalFilters } from '../types/metrics'
 import { fetchTabCounts, fetchTabMetrics } from './metricsService'
 import { isAuthError } from '../utils/apiUtils'
+import { useAuth } from '../auth/AuthContext'
 
 const STALE_TIME = 5 * 60 * 1000 // 5 minutes
 const REFETCH_INTERVAL = 0 // disabled to avoid periodic refetch
@@ -23,7 +24,7 @@ export const useMetricsData = (
   tab: TabId,
   globalFilters: GlobalFilters
 ): UseMetricsDataResult => {
-  const isAuthenticated = true
+  const { isAuthenticated } = useAuth()
 
   const countsQuery = useQuery({
     queryKey: [
@@ -45,7 +46,7 @@ export const useMetricsData = (
         return null
       }
     },
-    enabled: true,
+    enabled: isAuthenticated,
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
     refetchInterval: REFETCH_INTERVAL || false,
@@ -64,7 +65,7 @@ export const useMetricsData = (
       globalFilters.dateRange.end.toISOString()
     ],
     queryFn: () => fetchTabMetrics(tab, globalFilters),
-    enabled: true,
+    enabled: isAuthenticated,
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
     refetchInterval: REFETCH_INTERVAL || false,
@@ -109,7 +110,7 @@ export const useMetricsData = (
       : null,
     refetch: refetchAll,
     isAuthenticated,
-    requiresAuth: false
+    requiresAuth: !isAuthenticated
   }
 }
 

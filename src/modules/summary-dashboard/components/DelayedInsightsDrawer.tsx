@@ -19,7 +19,7 @@ interface DelayedInsightsDrawerProps {
 const ALERT_COLORS: Record<Exclude<AlertOptionId, 'all'>, string> = {
   long_stoppage: 'var(--critical)',
   stop_breach: 'var(--warning)',
-  route_deviation: 'var(--primary)',
+  route_deviation: 'var(--critical)',
   eway_bill: 'var(--secondary)',
   diversion: 'var(--positive)'
 }
@@ -40,11 +40,8 @@ const ChartBar = ({
   const heightPct = maxValue ? Math.max(32, Math.round((total / maxValue) * 160)) : 0
   // Check if any segment has values - if not, show default delayed color
   const hasSegmentValues = segments.some(s => s.value > 0)
-  const tooltipText = `${transporter} • ${total}`
-
   return (
     <div
-      title={tooltipText}
       style={{ flex: 1, minWidth: 54, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-x2)' }}
     >
       <div style={{ height: 180, display: 'flex', alignItems: 'flex-end', width: '100%' }}>
@@ -178,6 +175,10 @@ const TransporterAlertChart = ({
   }
   const maxValue = Math.max(1, ...displayTotals.map(item => item.total))
   const axisTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => Math.round(maxValue * ratio))
+  const gridLineColor = 'var(--border-primary)'
+  const verticalGridPositions = displayTotals.length > 0
+    ? Array.from({ length: displayTotals.length + 1 }, (_, index) => (index / displayTotals.length) * 100)
+    : []
 
   return (
     <div>
@@ -192,25 +193,57 @@ const TransporterAlertChart = ({
               </Typography>
             ))}
         </div>
-        <div style={{ display: 'flex', gap: 'var(--spacing-x4)', padding: '0 0', overflowX: 'auto', flex: 1 }}>
-          {displayTotals.map((item) => {
-            const segments =
-              selectedAlert === 'all'
-                ? (Object.keys(item.counts) as Exclude<AlertOptionId, 'all'>[]).map(alert => ({
-                    alert,
-                    value: item.counts[alert]
-                  }))
-                : [{ alert: selectedAlert, value: item.counts[selectedAlert] }]
-            return (
-              <ChartBar
-                key={item.transporter}
-                transporter={item.transporter}
-                total={item.total}
-                segments={segments}
-                maxValue={maxValue}
+        <div style={{ position: 'relative', flex: 1 }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 180, pointerEvents: 'none' }}>
+            {axisTicks.map((tick) => (
+              <div
+                key={`grid-y-${tick}`}
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  bottom: `${maxValue ? (tick / maxValue) * 100 : 0}%`,
+                  height: 1,
+                  backgroundColor: gridLineColor,
+                  opacity: 0.35
+                }}
               />
-            )
-          })}
+            ))}
+            {verticalGridPositions.map((left) => (
+              <div
+                key={`grid-x-${left}`}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  left: `${left}%`,
+                  width: 1,
+                  backgroundColor: gridLineColor,
+                  opacity: 0.2
+                }}
+              />
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 'var(--spacing-x4)', padding: '0 0', overflowX: 'auto', flex: 1 }}>
+            {displayTotals.map((item) => {
+              const segments =
+                selectedAlert === 'all'
+                  ? (Object.keys(item.counts) as Exclude<AlertOptionId, 'all'>[]).map(alert => ({
+                      alert,
+                      value: item.counts[alert]
+                    }))
+                  : [{ alert: selectedAlert, value: item.counts[selectedAlert] }]
+              return (
+                <ChartBar
+                  key={item.transporter}
+                  transporter={item.transporter}
+                  total={item.total}
+                  segments={segments}
+                  maxValue={maxValue}
+                />
+              )
+            })}
+          </div>
         </div>
       </div>
       <div style={{ display: 'flex', gap: 'var(--spacing-x4)', marginTop: 'var(--spacing-x3)' }}>
@@ -307,9 +340,9 @@ export default function DelayedInsightsDrawer({
           </div>
         </div>
 
-        <Card style={{ padding: 'var(--spacing-x5)', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', marginBottom: '0px', flexDirection: 'column', height: 'fit-content', fontWeight: 600, padding: 0 }}>
-            <div>
+        <Card style={{ padding: 0, marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', marginBottom: '0px', flexDirection: 'column', height: 'fit-content', fontWeight: 600, padding: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <Typography variant="display-primary" style={{ fontSize: 'var(--font-size-xxl)' }}>{selectedTotal}</Typography>
               <Typography variant="body-secondary-regular" color="tertiary">
                 {percentOfActive}% of Active Journeys
@@ -347,7 +380,7 @@ export default function DelayedInsightsDrawer({
           )}
         </Card>
 
-        <Typography variant="body-primary-semibold" style={{ marginBottom: 'var(--spacing-x4)' }}>
+        <Typography variant="body-primary-semibold" style={{ marginBottom: 'var(--spacing-x4)', color: 'var(--color-primary)' }}>
           Critical Journeys
         </Typography>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-x4)' }}>

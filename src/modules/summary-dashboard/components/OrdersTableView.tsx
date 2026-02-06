@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button, Badge, Typography, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from 'ft-design-system'
 import { useOrdersTableData } from '../hooks/useOrdersTableData'
-import { getCustomDataTemplate } from '../data/ordersApiService'
-import type { OrderRow, OrderStatus, CustomDataTemplateField } from '../types/orders'
+import type { OrderRow, OrderStatus } from '../types/orders'
 import type { GlobalFilters } from '../types/metrics'
 import TableSkeleton from './TableSkeleton'
 import { formatDateTime } from '../utils/ordersFormat'
@@ -28,40 +27,9 @@ export default function OrdersTableView({
     globalFilters,
   })
 
-  const [customFields, setCustomFields] = useState<CustomDataTemplateField[]>([])
-
-  // Fetch custom data template fields
-  useEffect(() => {
-    getCustomDataTemplate()
-      .then(fields => setCustomFields(fields))
-      .catch(err => {
-        console.warn('Failed to load custom data template:', err)
-        setCustomFields([])
-      })
-  }, [])
-
-  // Calculate total column count (fixed + custom)
   const fixedColumnCount = 12
-  const totalColumnCount = fixedColumnCount + customFields.length
 
-  // Format custom field value for display
-  const formatCustomValue = (value: any, field: CustomDataTemplateField): string => {
-    if (value === null || value === undefined || value === '') {
-      return '-'
-    }
-    if (field.type === 'number') {
-      return String(Number(value))
-    }
-    return String(value)
-  }
-
-  // Get custom field label (human-readable)
-  const getCustomFieldLabel = (fieldName: string): string => {
-    return fieldName
-      .replace(/([A-Z])/g, ' $1')
-      .replace(/^./, str => str.toUpperCase())
-      .trim()
-  }
+  const [hoveredRowId, setHoveredRowId] = useState<string | null>(null)
 
   const getStatusBadgeVariant = (status: OrderStatus): 'default' | 'warning' | 'info' | 'neutral' => {
     switch (status) {
@@ -88,6 +56,13 @@ export default function OrdersTableView({
   const getCellValue = (value: string | number | null | undefined): string => {
     if (value === null || value === undefined || value === '') return '-'
     return String(value)
+  }
+
+  const textCellStyle: React.CSSProperties = {
+    maxWidth: '180px',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis'
   }
 
   const tableOrders = hasError ? [] : orders
@@ -167,20 +142,12 @@ export default function OrdersTableView({
                   Actions
                 </Typography>
               </TableHead>
-              {/* Custom data columns */}
-              {customFields.map((field) => (
-                <TableHead key={field.name} colorVariant="dark25">
-                  <Typography variant="body-secondary-semibold" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)' }}>
-                    {getCustomFieldLabel(field.name)}
-                  </Typography>
-                </TableHead>
-              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
             {showNoData ? (
               <TableRow>
-                <TableCell colSpan={totalColumnCount}>
+                <TableCell colSpan={fixedColumnCount}>
                   <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
                     No data available
                   </Typography>
@@ -190,52 +157,45 @@ export default function OrdersTableView({
               tableOrders.map((row: OrderRow) => (
                 <TableRow
                   key={row.id}
-                  onMouseEnter={(e) => {
-                    const cells = e.currentTarget.querySelectorAll('td')
-                    cells.forEach((cell) => {
-                      ;(cell as HTMLElement).style.backgroundColor = 'var(--bg-secondary)'
-                    })
+                  onMouseEnter={() => setHoveredRowId(row.id)}
+                  onMouseLeave={() => setHoveredRowId(null)}
+                  style={{
+                    transition: 'background-color 0.15s ease',
+                    backgroundColor: hoveredRowId === row.id ? 'var(--bg-secondary)' : 'transparent'
                   }}
-                  onMouseLeave={(e) => {
-                    const cells = e.currentTarget.querySelectorAll('td')
-                    cells.forEach((cell) => {
-                      ;(cell as HTMLElement).style.backgroundColor = ''
-                    })
-                  }}
-                  style={{ transition: 'background-color 0.15s ease' }}
                 >
                   <TableCell>
-                    <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)' }}>
+                    <Typography variant="body-primary-regular" title={getCellValue(row.orderId)} style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)', ...textCellStyle }}>
                       {getCellValue(row.orderId)}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)' }}>
+                    <Typography variant="body-primary-regular" title={getCellValue(row.consignorName)} style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)', ...textCellStyle }}>
                       {getCellValue(row.consignorName)}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)' }}>
+                    <Typography variant="body-primary-regular" title={getCellValue(row.consigneeName)} style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)', ...textCellStyle }}>
                       {getCellValue(row.consigneeName)}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)' }}>
+                    <Typography variant="body-primary-regular" title={getCellValue(row.route)} style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)', ...textCellStyle }}>
                       {getCellValue(row.route)}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)' }}>
+                    <Typography variant="body-primary-regular" title={getCellValue(row.tripType)} style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)', ...textCellStyle }}>
                       {getCellValue(row.tripType)}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)' }}>
+                    <Typography variant="body-primary-regular" title={getCellValue(row.stage)} style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)', ...textCellStyle }}>
                       {getCellValue(row.stage)}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)' }}>
+                    <Typography variant="body-primary-regular" title={getCellValue(row.milestone)} style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary)', ...textCellStyle }}>
                       {getCellValue(row.milestone)}
                     </Typography>
                   </TableCell>
@@ -253,11 +213,13 @@ export default function OrdersTableView({
                   <TableCell>
                     <Typography
                       variant="body-primary-regular"
+                      title={row.relatedIdType && row.relatedId ? `${row.relatedIdType}: ${row.relatedId}` : '-'}
                       style={{
                         fontSize: 'var(--font-size-sm)',
                         color: 'var(--primary)',
                         cursor: 'default',
-                        textDecoration: 'none'
+                        textDecoration: 'none',
+                        ...textCellStyle
                       }}
                     >
                       {row.relatedIdType && row.relatedId ? `${row.relatedIdType}: ${row.relatedId}` : '-'}
@@ -294,7 +256,7 @@ export default function OrdersTableView({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)' }}>
+                    <Typography variant="body-primary-regular" title={row.dispatchDate ? formatDateTime(row.dispatchDate) : '-'} style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)', ...textCellStyle }}>
                       {row.dispatchDate ? formatDateTime(row.dispatchDate) : '-'}
                     </Typography>
                   </TableCell>
@@ -315,17 +277,6 @@ export default function OrdersTableView({
                       }}
                     />
                   </TableCell>
-                  {/* Custom data cells */}
-                  {customFields.map((field) => {
-                    const customValue = row.customData?.[field.name]
-                    return (
-                      <TableCell key={field.name}>
-                        <Typography variant="body-primary-regular" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)' }}>
-                          {formatCustomValue(customValue, field)}
-                        </Typography>
-                      </TableCell>
-                    )
-                  })}
                 </TableRow>
               ))
             )}
