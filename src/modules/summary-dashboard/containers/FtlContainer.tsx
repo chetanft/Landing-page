@@ -56,7 +56,6 @@ export default function FtlContainer({
         transporters={delayedAnalytics.transporters}
         criticalJourneys={delayedAnalytics.criticalJourneys}
         availableAlerts={delayedAnalytics.availableAlerts}
-        delayedCount={delayedAnalytics.delayedCount}
         activeCount={delayedAnalytics.activeCount}
         selectedCount={delayedSelectedCount}
       />

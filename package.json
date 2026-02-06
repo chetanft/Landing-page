@@ -37,7 +37,7 @@
     "@deck.gl/react": "^9.2.6",
     "@tanstack/react-query": "^5.90.18",
     "crypto-js": "^4.2.0",
-    "ft-design-system": "^4.19.5",
+    "ft-design-system": "^4.20.0",
     "maplibre-gl": "^4.7.1",
     "pg": "^8.11.0",
     "react": "^19.2.3",

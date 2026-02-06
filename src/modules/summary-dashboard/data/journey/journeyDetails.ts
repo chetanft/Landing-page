@@ -31,6 +31,7 @@ export const fetchJourneyTrackingDetails = async (
     const data = await response.json()
     if (data?.success) {
       journeyTrackingDetailsCache.set(journeyFteid, data.data)
+      notifyJourneySearchUpdate()
       return data.data
     }
   } catch (error) {

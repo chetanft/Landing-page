@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { QuickFilters, QuickFilter, FilterOption } from 'ft-design-system'
 import type { TabData, GlobalFilters } from '../types/metrics'
+import type { OrderRow } from '../types/orders'
 import { useOrdersTableData } from '../hooks/useOrdersTableData'
 import OrderDetailsDrawer from '../components/OrderDetailsDrawer'
 import OrdersTableView from '../components/OrdersTableView'
@@ -88,15 +89,18 @@ export default function OrdersContainer({
 }: OrdersContainerProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
+  const [selectedOrder, setSelectedOrder] = useState<OrderRow | null>(null)
 
-  const handleOpenOrderDetails = useCallback((orderId: string) => {
-    setSelectedOrderId(orderId)
+  const handleOpenOrderDetails = useCallback((order: OrderRow) => {
+    setSelectedOrderId(order.orderId || order.id)
+    setSelectedOrder(order)
     setIsDrawerOpen(true)
   }, [])
 
   const handleCloseDrawer = useCallback(() => {
     setIsDrawerOpen(false)
     setSelectedOrderId(null)
+    setSelectedOrder(null)
   }, [])
 
   return (
@@ -104,6 +108,7 @@ export default function OrdersContainer({
       <OrderDetailsDrawer
         open={isDrawerOpen}
         orderId={selectedOrderId}
+        fallbackOrder={selectedOrder}
         onClose={handleCloseDrawer}
       />
 

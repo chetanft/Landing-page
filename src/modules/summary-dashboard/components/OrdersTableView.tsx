@@ -12,7 +12,7 @@ interface OrdersTableViewProps {
   selectedFilters: Set<FilterId>
   selectedOutboundOption: string | null
   globalFilters: GlobalFilters
-  onOpenDetails: (orderId: string) => void
+  onOpenDetails: (order: OrderRow) => void
 }
 
 export default function OrdersTableView({
@@ -267,7 +267,7 @@ export default function OrdersTableView({
                       iconPosition="only"
                       size="sm"
                       className="rounded-full"
-                      onClick={() => onOpenDetails(row.id)}
+                      onClick={() => onOpenDetails(row)}
                       style={{
                         height: 'var(--component-height-md)',
                         width: 'var(--component-height-md)',

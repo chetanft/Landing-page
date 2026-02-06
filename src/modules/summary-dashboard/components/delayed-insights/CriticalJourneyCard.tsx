@@ -8,7 +8,7 @@ interface CriticalJourneyCardProps {
 
 export default function CriticalJourneyCard({ journey }: CriticalJourneyCardProps) {
   return (
-    <Card style={{ padding: 'var(--spacing-x4)' }}>
+    <Card style={{ padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--spacing-x3)' }}>
         <Typography variant="body-primary-semibold">{journey.vehicleNumber}</Typography>
         <Typography variant="body-secondary-regular" style={{ color: 'var(--critical)' }}>

@@ -23,6 +23,11 @@ body {
   display: flex !important;
 }
 
+/* Delayed insights summary card padding override */
+.delayed-insights-summary-card .flex-1.p-6 {
+  padding: 0 !important;
+}
+
 .date-picker-wrapper {
   width: 100% !important;
   flex: 1 1 auto !important;
@@ -238,6 +243,15 @@ p.font-sans.text-sm-rem.font-normal[style*="font-size"][style*="var(--font-size-
 /* This rule targets p elements with font-sans class that have width: 100% in style (matching "Transporter Wise Breakdown" heading) */
 p.font-sans[style*="width: 100%"] {
   color: var(--color-secondary) !important;
+}
+
+/* Delayed Insights Card padding override */
+/* Removes Card body padding for Transporter Wise Breakdown section */
+.delayed-insights-breakdown-card > div.flex-1 {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }
 
 /* FilterOption Typography color override - targets Typography with body-primary-regular variant */
@@ -529,7 +543,7 @@ svg[width="14"][height="14"] {
 /* FilterPane has z-index 10051, so dropdowns need higher z-index */
 /* Targets dropdown portal containers created by SelectLegacy components */
 body > div[style*="position: absolute"][style*="z-index"] {
-  z-index: 10052 !important;
+  z-index: 11100 !important;
 }
 
 /* More specific selector for SelectLegacy dropdown portals */
@@ -537,7 +551,7 @@ body > div[style*="position: absolute"][style*="z-index"] {
 div[role="listbox"],
 div[class*="select-dropdown"],
 div[class*="dropdown-menu"] {
-  z-index: 10052 !important;
+  z-index: 11100 !important;
 }
 
 /* DeckGL view container styling */

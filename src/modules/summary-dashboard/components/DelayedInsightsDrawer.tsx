@@ -2,7 +2,8 @@ import { useEffect } from 'react'
 import { Card, Typography, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from 'ft-design-system'
 import type { AlertOptionId, CriticalJourneyItem, TransporterAlertBreakdown } from '../hooks/useDelayedJourneysAnalytics'
 import { getAlertLabel } from '../hooks/useDelayedJourneysAnalytics'
-import { TransporterAlertChart, CriticalJourneyCard } from './delayed-insights'
+import TransporterAlertBarChart from './delayed-insights/TransporterAlertBarChart'
+import { CriticalJourneyCard } from './delayed-insights'
 
 interface DelayedInsightsDrawerProps {
   open: boolean
@@ -12,7 +13,6 @@ interface DelayedInsightsDrawerProps {
   transporters: TransporterAlertBreakdown[]
   criticalJourneys: CriticalJourneyItem[]
   availableAlerts: AlertOptionId[]
-  delayedCount: number
   activeCount: number
   selectedCount?: number | null
 }
@@ -25,7 +25,6 @@ export default function DelayedInsightsDrawer({
   transporters,
   criticalJourneys,
   availableAlerts,
-  delayedCount,
   activeCount,
   selectedCount
 }: DelayedInsightsDrawerProps) {
@@ -41,9 +40,11 @@ export default function DelayedInsightsDrawer({
   if (!open) return null
 
   const headerTitle = selectedAlert === 'all' ? 'Delayed' : getAlertLabel(selectedAlert)
-  const computedTotal = selectedAlert === 'all'
-    ? delayedCount
-    : transporters.reduce((sum, item) => sum + item.counts[selectedAlert], 0)
+  const computedTotal = transporters.reduce((sum, item) => (
+    selectedAlert === 'all'
+      ? sum + item.total
+      : sum + item.counts[selectedAlert]
+  ), 0)
   const selectedTotal = selectedCount ?? computedTotal
   const percentOfActive = activeCount > 0 ? Math.round((selectedTotal / activeCount) * 100) : 0
 
@@ -94,8 +95,8 @@ export default function DelayedInsightsDrawer({
           </div>
         </div>
 
-        <Card style={{ padding: 0, marginBottom: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', marginBottom: '0px', flexDirection: 'column', height: 'fit-content', fontWeight: 600, padding: '20px' }}>
+        <Card className="delayed-insights-summary-card" style={{ padding: '16px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', marginBottom: '0px', flexDirection: 'column', height: 'fit-content', fontWeight: 600 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <Typography variant="display-primary" style={{ fontSize: 'var(--font-size-xxl)' }}>{selectedTotal}</Typography>
               <Typography variant="body-secondary-regular" color="tertiary">
@@ -105,7 +106,7 @@ export default function DelayedInsightsDrawer({
           </div>
         </Card>
 
-        <Card style={{ padding: 'var(--spacing-x5)', marginBottom: 'var(--spacing-x6)' }}>
+        <Card className="delayed-insights-breakdown-card" style={{ padding: 'var(--spacing-x5)', marginBottom: 'var(--spacing-x6)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-x4)' }}>
             <Typography variant="body-primary-semibold" style={{ width: '100%' }}>Transporter Wise Breakdown</Typography>
             <Select value={selectedAlert} onValueChange={(value) => onAlertChange(value as AlertOptionId)}>
@@ -126,10 +127,9 @@ export default function DelayedInsightsDrawer({
               No transporter data available for this alert.
             </Typography>
           ) : (
-            <TransporterAlertChart
+            <TransporterAlertBarChart
               transporters={transporters}
               selectedAlert={selectedAlert}
-              totalOverride={selectedTotal}
             />
           )}
         </Card>

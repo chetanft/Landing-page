@@ -58,6 +58,59 @@ export function normalizeStatus(status: any): OrderRow['status'] {
   return statusMap[upper] || (normalized as OrderRow['status'])
 }
 
+const STATUS_MILESTONE_MAP: Record<string, string> = {
+  UNPLANNED: 'Unplanned',
+  PLANNED: 'Planned',
+  PARTIALLY_PLANNED: 'Partially Planned',
+  IN_PROGRESS: 'In Progress',
+  DISPATCHED: 'Dispatched',
+  DELIVERED: 'Delivered',
+  PARTIALLY_DELIVERED: 'Partially Delivered',
+  FAILED: 'Failed',
+  CANCELLED: 'Cancelled'
+}
+
+const BUCKET_MILESTONE_MAP: Record<string, string> = {
+  SERVICEABLE: 'Serviceable',
+  UNSERVICEABLE: 'Unserviceable',
+  PROCESSING: 'Processing',
+  BOOKED: 'Booked',
+  FAILED: 'Failed',
+  CANCELLED: 'Cancelled'
+}
+
+function resolveStageAndMilestone(
+  apiOrder: any,
+  tripType: OrderRow['tripType'],
+  statusCode: string
+): { stage: string; milestone?: string } {
+  const stageFromApi = String(apiOrder.stage || apiOrder.orderStage || apiOrder.stage_name || '').trim()
+  const milestoneFromApi = String(apiOrder.milestone || apiOrder.milestone_name || apiOrder.milestoneLabel || '').trim()
+  const bucketCode = String(apiOrder.bucket || apiOrder.bucket_name || apiOrder.bucketName || '').trim().toUpperCase()
+  const journeyStatusCode = String(apiOrder.journey_status || apiOrder.journeyStatus || '').trim().toUpperCase()
+
+  const inferredStage =
+    tripType === 'FTL'
+      ? 'FTL'
+      : tripType === 'PTL'
+        ? 'PTL'
+        : statusCode.includes('DELIVERED')
+          ? 'Invoicing'
+          : 'Planning'
+
+  const stage = stageFromApi || inferredStage
+
+  const milestoneFromStatus = STATUS_MILESTONE_MAP[statusCode]
+  const milestoneFromBucket = BUCKET_MILESTONE_MAP[bucketCode]
+  const milestoneFromJourney = STATUS_MILESTONE_MAP[journeyStatusCode]
+  const milestone =
+    milestoneFromApi && milestoneFromApi.toLowerCase() !== String(normalizeStatus(statusCode)).toLowerCase()
+      ? milestoneFromApi
+      : milestoneFromBucket || milestoneFromJourney || milestoneFromStatus
+
+  return { stage, milestone }
+}
+
 /**
  * Normalize delivery status
  */
@@ -190,6 +243,7 @@ export function normalizeOrderRow(
     const resolvedId = resolveOrderId(apiOrder)
     const tripType = resolveTripType(apiOrder)
     const status = normalizeStatus(apiOrder.status || apiOrder.orderStatus)
+    const statusCode = String(apiOrder.status || apiOrder.orderStatus || '').trim().toUpperCase().replace(/\s+/g, '_')
 
     const delayValue = apiOrder.delayDays || apiOrder.delay_days ||
                       (apiOrder.delayMinutes ? Math.ceil(apiOrder.delayMinutes / (24 * 60)) : undefined)
@@ -200,6 +254,7 @@ export function normalizeOrderRow(
 
     const { relatedId, relatedIdType } = extractRelatedId(apiOrder)
     const route = buildRouteString(apiOrder)
+    const { stage, milestone } = resolveStageAndMilestone(apiOrder, tripType, statusCode)
 
     // Ensure required fields exist
     const possibleIds = [
@@ -265,8 +320,8 @@ export function normalizeOrderRow(
       consigneeName,
       route: route || '—',
       tripType,
-      stage: String(apiOrder.stage || apiOrder.orderStage || apiOrder.stage_name || '—').trim() || '—',
-      milestone: String(apiOrder.milestone || apiOrder.milestone_name || apiOrder.milestoneLabel || '').trim() || undefined,
+      stage: stage || '—',
+      milestone,
       status,
       relatedIdType,
       relatedId: String(relatedId || '—').trim() || '—',

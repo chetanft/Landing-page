@@ -13,7 +13,9 @@ export function formatCurrency(amount: number, currency: string = '₹'): string
  * Format date to display format (e.g., "3 PM, 10 Feb 24")
  */
 export function formatDateTime(dateString: string): string {
+  if (!dateString) return '-'
   const date = new Date(dateString)
+  if (Number.isNaN(date.getTime())) return '-'
   const hours = date.getHours()
   const minutes = date.getMinutes()
   const ampm = hours >= 12 ? 'PM' : 'AM'
@@ -31,7 +33,9 @@ export function formatDateTime(dateString: string): string {
  * Format date only (e.g., "10 Feb 24")
  */
 export function formatDate(dateString: string): string {
+  if (!dateString) return '-'
   const date = new Date(dateString)
+  if (Number.isNaN(date.getTime())) return '-'
   const day = date.getDate()
   const month = date.toLocaleDateString('en-US', { month: 'short' })
   const year = date.getFullYear().toString().slice(-2)

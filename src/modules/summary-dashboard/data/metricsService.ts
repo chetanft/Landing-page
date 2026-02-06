@@ -163,13 +163,19 @@ const buildRealOrdersLifecycleStages = async (
     const hasDoCounts = Object.values(doCounts).some((value) => value > 0)
     const ftlGroup = 'orders.in_execution.ftl'
     const ftlGroupLabel = 'FTL'
-    const addFtlMetric = (metricId: string, label: string, count: number) => {
+    const addFtlMetric = (metricId: string, label: string, count: number, journeyStatus: string) => {
       inExecutionMetrics.push({
         metricId,
         label,
         count,
         statusType: 'neutral',
-        target: { path: '/tms/orders', defaultFilters: {} },
+        target: {
+          path: '/tms/orders',
+          defaultFilters: {
+            tripType: ['FTL'],
+            journey_status: [journeyStatus]
+          }
+        },
         isMissing: !hasDoCounts,
         groupKey: ftlGroup,
         groupLabel: ftlGroupLabel,
@@ -177,10 +183,10 @@ const buildRealOrdersLifecycleStages = async (
       })
     }
 
-    addFtlMetric('orders.in_execution.ftl.en_route', 'En route to loading', doCounts.BEFORE_ORIGIN ?? 0)
-    addFtlMetric('orders.in_execution.ftl.at_loading', 'At loading', doCounts.AT_ORIGIN ?? 0)
-    addFtlMetric('orders.in_execution.ftl.in_transit', 'In transit', doCounts.IN_TRANSIT ?? 0)
-    addFtlMetric('orders.in_execution.ftl.at_destination', 'At destination', doCounts.AT_DESTINATION ?? 0)
+    addFtlMetric('orders.in_execution.ftl.en_route', 'En route to loading', doCounts.BEFORE_ORIGIN ?? 0, 'BEFORE_ORIGIN')
+    addFtlMetric('orders.in_execution.ftl.at_loading', 'At loading', doCounts.AT_ORIGIN ?? 0, 'AT_ORIGIN')
+    addFtlMetric('orders.in_execution.ftl.in_transit', 'In transit', doCounts.IN_TRANSIT ?? 0, 'IN_TRANSIT')
+    addFtlMetric('orders.in_execution.ftl.at_destination', 'At destination', doCounts.AT_DESTINATION ?? 0, 'AT_DESTINATION')
 
     return [
       // Planning Column

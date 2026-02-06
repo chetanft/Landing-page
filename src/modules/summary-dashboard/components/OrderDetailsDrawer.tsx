@@ -6,16 +6,64 @@ import {
 } from 'ft-design-system'
 import { useOrderDrawerData, type DrawerTab } from '../hooks/useOrderDrawerData'
 import { OrderDetailsTab, OrderTimelineTab, OrderCommentsTab } from './order-drawer'
+import type { OrderRow, OrderDetailsResponse } from '../types/orders'
 
 interface OrderDetailsDrawerProps {
   open: boolean
   orderId: string | null
+  fallbackOrder?: OrderRow | null
   onClose: () => void
 }
+
+const buildFallbackDetails = (order: OrderRow): OrderDetailsResponse['data'] => ({
+  summary: {
+    soNumber: order.soNumber || order.orderId,
+    totalWeight: 0,
+    totalWeightUom: 'kg',
+    doCount: 0,
+    skuCount: 0,
+    totalCost: 0,
+    currency: '₹',
+    createdAt: order.dispatchDate || '',
+    stage: order.stage || '—',
+    status: order.status,
+    deliveryStatus: order.deliveryStatus,
+    eta: order.deliveryEta,
+  },
+  parties: {
+    sender: {
+      name: order.consignorName || '—',
+      address: '—',
+      gstin: '—',
+      email: '—',
+      phone: '—'
+    },
+    shipTo: {
+      name: order.consigneeName || '—',
+      address: '—',
+      gstin: '—',
+      email: '—',
+      phone: '—'
+    },
+    billTo: {
+      name: order.consigneeName || '—',
+      address: '—',
+      gstin: '—',
+      email: '—',
+      phone: '—'
+    }
+  },
+  identifiers: {
+    planningId: order.orderId,
+    journeyId: order.relatedIdType === 'Trip' ? order.relatedId : undefined,
+    invoiceNumber: order.relatedIdType === 'INV' ? order.relatedId : undefined,
+  }
+})
 
 export default function OrderDetailsDrawer({
   open,
   orderId,
+  fallbackOrder = null,
   onClose,
 }: OrderDetailsDrawerProps) {
   const [activeTab, setActiveTab] = useState<DrawerTab>('details')
@@ -69,6 +117,8 @@ export default function OrderDetailsDrawer({
   }
 
   if (!open || !orderId) return null
+  const detailsForRender = details || (fallbackOrder ? buildFallbackDetails(fallbackOrder) : null)
+  const detailsErrorForRender = detailsForRender ? null : detailsError
 
   const drawerContent = (
     <>
@@ -82,7 +132,7 @@ export default function OrderDetailsDrawer({
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(0, 0, 0, 0.3)',
-          zIndex: 1000,
+          zIndex: 11000,
           opacity: 1,
           transition: 'opacity 0.2s ease-in-out',
         }}
@@ -99,7 +149,7 @@ export default function OrderDetailsDrawer({
           maxWidth: '90vw',
           backgroundColor: 'var(--bg-primary)',
           boxShadow: '0px 8px 20px 0px rgba(0, 0, 0, 0.16)',
-          zIndex: 1001,
+          zIndex: 11001,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -214,9 +264,9 @@ export default function OrderDetailsDrawer({
         >
           {activeTab === 'details' && (
             <OrderDetailsTab
-              details={details}
+              details={detailsForRender}
               loading={detailsLoading}
-              error={detailsError}
+              error={detailsErrorForRender}
               onRetry={refetchDetails}
             />
           )}

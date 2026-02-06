@@ -7,6 +7,7 @@ import {
   subscribeToJourneySearchUpdates,
   getJourneyAlertsForJourney
 } from '../data/journeyApiService'
+import { journeyTrackingDetailsCache } from '../data/journey/journeyCache'
 
 export type AlertOptionId = 'all' | 'long_stoppage' | 'stop_breach' | 'route_deviation' | 'eway_bill' | 'diversion'
 
@@ -70,7 +71,14 @@ const normalizeAlertName = (value?: string): Exclude<AlertOptionId, 'all'> | nul
 }
 
 const getDelayMinutes = (journey: Record<string, unknown>): number => {
-  const raw = journey.delay_in_minutes
+  const journeyId = journey.journey_fteid ? String(journey.journey_fteid) : ''
+  const trackingDetails = journeyId ? journeyTrackingDetailsCache.get(journeyId) : null
+  const raw =
+    journey.delay_in_minutes ??
+    journey.delayInMinutes ??
+    trackingDetails?.delay_in_minutes ??
+    trackingDetails?.delayInMinutes
+
   if (typeof raw === 'number') return raw
   if (typeof raw === 'string') {
     const parsed = parseFloat(raw)
